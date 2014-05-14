@@ -40,6 +40,12 @@ main = do
   print r
   when (r /= 32) (error "test failed")
 
+  putStrLn "Test a sequence of queries"
+  runQ $ do
+    query $ Dec 33
+    query $ Inc 15
+    query $ StrLenQuery "Hi"
+
 
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)
