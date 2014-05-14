@@ -106,12 +106,12 @@ iRunViewedQ db i = case i of
     -- new results are encountered
 
     rrs <- mapM (\v -> iRunQ db (k v)) rs
+    -- BUG: ^ the above does not share DB because map is "parallel"
     return $ concat rrs
 
   MPlus l -> do
     rs <- mapM (iRunViewedQ db) l
-    -- now we have 0 or more results. TODO: we need to force everything
-    -- to be list-returning now...
+    -- BUG: ^ the above does not share DB because map is "parallel"
     return $ concat rs
 
 previousResultsForQuery :: (Qable q a) => DB -> q -> [a]
