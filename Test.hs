@@ -19,25 +19,25 @@ main = do
 
 
   putStrLn "test push and pull a query"
-  r <- runQ $ query $ StrLenQuery "Hello"
+  [r] <- runQ $ query $ StrLenQuery "Hello"
   putStr "test result: "
   print r
   when (r /= 5) (error "test failed")
 
   putStrLn "test push and pull another query"
-  r <- runQ $ query $ StrLenQuery "Hello World"
+  [r] <- runQ $ query $ StrLenQuery "Hello World"
   putStr "test result: "
   print r
   when (r /= 11) (error "test failed")
 
   putStrLn "test Inc 10"
-  r <- runQ $ query $ Inc 10
+  [r] <- runQ $ query $ Inc 10
   putStr "test result: "
   print r
   when (r /= 11) (error "test failed")
 
   putStrLn "test Dec 33"
-  r <- runQ $ query $ Dec 33
+  [r] <- runQ $ query $ Dec 33
   putStr "test result: "
   print r
   when (r /= 32) (error "test failed")
@@ -49,11 +49,18 @@ main = do
     query $ StrLenQuery "Hi"
 
   putStrLn "Test same query twice"
-  (a1, a2) <- runQ $ do
+  rv <- runQ $ do
     r1 <- query $ Inc 15
     r2 <- query $ Inc 15
     return (r1, r2)
-  when ((a1, a2) /= (16, 16)) (error "test failed")
+  putStrLn "rv = "
+  print rv
+  when ( rv /= [(16,16)]) $ error "test failed"  
+
+  putStrLn "A push and a pull in mplus-style parallel"
+  r <- runQ $ (qpush (Inc 15) >> mzero) `mplus` (qpull (Inc 15))
+  putStrLn "Test result: "
+  print r
 
 
 instance Qable StrLenQuery Int where

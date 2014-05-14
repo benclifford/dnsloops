@@ -15,7 +15,8 @@ import Data.Typeable
 
 -- * The monad on which everything runs
 
-class (Show q, Show a, Eq q, Typeable q, Typeable a) => Qable q a | q -> a where
+class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
+  => Qable q a | q -> a where
 
   -- | Run the query in the underlying monad,
   -- giving an answer
@@ -50,17 +51,21 @@ emptyDB = DB {
     previousResults = []
   }
 
-runQ :: Q x -> IO x
+runQ :: Q x -> IO [x]
 runQ m = iRunQ emptyDB m
 
-iRunQ :: DB -> Q x -> IO x
-iRunQ db m = case view m of 
+iRunQ :: DB -> Q x -> IO [x]
+iRunQ db m = iRunViewedQ db (view m)
 
-  Return v -> return v
+iRunViewedQ :: DB -> ProgramViewP QInstruction x -> IO [x]
+iRunViewedQ db i = case i of
+
+  Return v -> return [v]
 
   (QT a) :>>= k -> do
     v <- a
     iRunQ db (k v)
+
   (QPush q) :>>= k -> do
     putStrLn "PUSH"
     putStrLn $ "Log query " ++ (show q) ++ " for future use"
@@ -72,15 +77,22 @@ iRunQ db m = case view m of
     v <- runQable q
     putStrLn $ "Value returned from query: " ++ (show v)
 
+    -- is this new?
+    let rs = previousResultsForQuery db q
+    if not (v `elem` rs) then do
+
     -- TODO: find any existing Pulls that have requested results
     -- from this query
 
-    putStrLn "Previous db: "
-    print $ previousResults db
-    let newdb = db { previousResults = (previousResults db) ++ [PreviousResult q v] }
-    putStrLn "New db: "
-    print $ previousResults newdb
-    iRunQ newdb (k ())
+      putStrLn "Previous db: "
+      print $ previousResults db
+      let newdb = db { previousResults = (previousResults db) ++ [PreviousResult q v] }
+      putStrLn "New db: "
+      print $ previousResults newdb
+      iRunQ newdb (k ())
+     else do
+      putStrLn "Duplicate result. Not processing as new result"
+      iRunQ db (k ())
 
   (QPull q) :>>= k -> do
     putStrLn "PULL"
@@ -90,13 +102,17 @@ iRunQ db m = case view m of
     -- TODO: look for previously cached results of the correct query
     let rs = previousResultsForQuery db q
 
-    -- TODO: this should be a non-deterministic mplus style fork
-    let v = head rs
-
     -- TODO: register some kind of continuation of k to be run when
     -- new results are encountered
 
-    iRunQ db (k v)
+    rrs <- mapM (\v -> iRunQ db (k v)) rs
+    return $ concat rrs
+
+  MPlus l -> do
+    rs <- mapM (iRunViewedQ db) l
+    -- now we have 0 or more results. TODO: we need to force everything
+    -- to be list-returning now...
+    return $ concat rs
 
 previousResultsForQuery :: (Qable q a) => DB -> q -> [a]
 previousResultsForQuery db q  = let
