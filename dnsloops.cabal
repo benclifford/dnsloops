@@ -1,0 +1,18 @@
+Name: dnsloops
+Version: 2.0
+Description: DNS lookup with feedback of newly found results
+License: AllRightsReserved
+Author: Ben Clifford <benc@cqx.ltd.uk>
+Build-Type: Simple
+Cabal-Version: >=1.6
+
+Executable dnsloops
+  Build-depends: base, dns, operational
+  main-is: Main.hs
+  ghc-options: -main-is Main
+
+Executable dnsloops-test
+  Build-depends: base, operational
+  main-is: Test.hs
+  ghc-options: -main-is Test
+
