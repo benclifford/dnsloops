@@ -71,6 +71,10 @@ iRunQ db m = case view m of
     putStrLn $ "Running uncached query " ++ (show q)
     v <- runQable q
     putStrLn $ "Value returned from query: " ++ (show v)
+
+    -- TODO: find any existing Pulls that have requested results
+    -- from this query
+
     putStrLn "Previous db: "
     print $ previousResults db
     let newdb = db { previousResults = (previousResults db) ++ [PreviousResult q v] }
@@ -89,9 +93,9 @@ iRunQ db m = case view m of
     -- TODO: this should be a non-deterministic mplus style fork
     let v = head rs
 
---    putStrLn $ "Running uncached query " ++ (show q)
---    v <- runQable q
---    putStrLn $ "Value returned from query: " ++ (show v)
+    -- TODO: register some kind of continuation of k to be run when
+    -- new results are encountered
+
     iRunQ db (k v)
 
 previousResultsForQuery :: (Qable q a) => DB -> q -> [a]

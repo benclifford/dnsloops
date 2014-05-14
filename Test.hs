@@ -48,6 +48,13 @@ main = do
     query $ Inc 15
     query $ StrLenQuery "Hi"
 
+  putStrLn "Test same query twice"
+  (a1, a2) <- runQ $ do
+    r1 <- query $ Inc 15
+    r2 <- query $ Inc 15
+    return (r1, r2)
+  when ((a1, a2) /= (16, 16)) (error "test failed")
+
 
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)
