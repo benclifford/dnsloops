@@ -2,6 +2,8 @@
 
 module Test where
 
+import Control.Monad
+
 import Q
 
 main = do
@@ -21,6 +23,7 @@ main = do
     qpull query
   putStr "test result: "
   print r
+  when (r /= 5) (error "test failed")
 
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)

@@ -23,32 +23,13 @@ type Q x = Program QInstruction x
 data QInstruction x where
   -- runs an action in the underlying IO monad
   QT :: IO x -> QInstruction x
+  -- | QPush asks for a query to be made without waiting for any answers
+  QPush :: Qable q a => q -> QInstruction ()
   -- | QPull asks for the responses to a query without launching that
   --   query. Often it should follow a push, I think, but sometimes not -
   --   for example when looking for cached values.
   -- but what should the type of this look like?
-  QPush :: Qable q a => q -> QInstruction ()
-  -- | QPull asks for the results of a query
   QPull :: Qable q a => q -> QInstruction a
-
-{-
-  -- | QPush asks for a query to be made without waiting for any answers
-   QPush :: Qable q a => q -> Q ()
-
-
-  | QPush Query
-  | QPull Query
--}
-
-{-
-instance Monad Q where
-  l >>= f = qbind l f 
-  return v = QT $ return v
-
-l `qbind` f = QT $ do
-    v <- runQ l
-    runQ (f v)
--}
 
 runQ :: Q x -> IO x
 runQ m = case view m of 
