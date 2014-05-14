@@ -7,7 +7,7 @@ module Q where
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Operational
+import Control.MonadPlus.Operational
 
 import Data.Dynamic
 import Data.Maybe
@@ -24,7 +24,7 @@ class (Show q, Show a, Eq q, Typeable q, Typeable a) => Qable q a | q -> a where
 -- | QInstruction are the simple instructions to be used
 -- inside the operational monad.
 
-type Q x = Program QInstruction x
+type Q x = ProgramP QInstruction x
 
 data QInstruction x where
   -- runs an action in the underlying IO monad
