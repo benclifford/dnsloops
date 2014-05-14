@@ -54,7 +54,9 @@ runQ m = iRunQ emptyDB m
 
 iRunQ :: DB -> Q x -> IO x
 iRunQ db m = case view m of 
+
   Return v -> return v
+
   (QT a) :>>= k -> do
     v <- a
     iRunQ db (k v)
@@ -74,6 +76,7 @@ iRunQ db m = case view m of
     putStrLn "New db: "
     print $ previousResults newdb
     iRunQ newdb (k ())
+
   (QPull q) :>>= k -> do
     putStrLn "PULL"
     putStrLn "Previous results are: "
