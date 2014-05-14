@@ -61,6 +61,7 @@ main = do
   r <- runQ $ (qpush (Inc 15) >> mzero) `mplus` (qpull (Inc 15))
   putStrLn "Test result: "
   print r
+  when ( r /= [16] ) $ error "test failed"
 
 
 instance Qable StrLenQuery Int where

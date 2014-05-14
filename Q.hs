@@ -8,6 +8,7 @@ module Q where
 import Control.Applicative
 import Control.Monad
 import Control.MonadPlus.Operational
+import Control.Monad.State.Strict
 
 import Data.Dynamic
 import Data.Maybe
@@ -38,6 +39,7 @@ data QInstruction x where
   -- but what should the type of this look like?
   QPull :: Qable q a => q -> QInstruction a
 
+-- * DB bits
 
 data PreviousResult where
   PreviousResult :: forall q . forall a . (Qable q a) => q -> a -> PreviousResult
@@ -51,77 +53,84 @@ emptyDB = DB {
     previousResults = []
   }
 
+
+
+-- * The interpreter
+
 runQ :: Q x -> IO [x]
-runQ m = iRunQ emptyDB m
+runQ m = evalStateT (iRunQ m) emptyDB
 
-iRunQ :: DB -> Q x -> IO [x]
-iRunQ db m = iRunViewedQ db (view m)
+iRunQ :: Q x -> StateT DB IO [x]
+iRunQ m = iRunViewedQ (view m)
 
-iRunViewedQ :: DB -> ProgramViewP QInstruction x -> IO [x]
-iRunViewedQ db i = case i of
+iRunViewedQ :: ProgramViewP QInstruction x -> StateT DB IO [x]
+iRunViewedQ i = case i of
 
   Return v -> return [v]
 
   (QT a) :>>= k -> do
-    v <- a
-    iRunQ db (k v)
+    v <- lift $ a
+    iRunQ (k v)
 
   (QPush q) :>>= k -> do
-    putStrLn "PUSH"
-    putStrLn $ "Log query " ++ (show q) ++ " for future use"
+    liftIO $ putStrLn "PUSH"
+    liftIO $ putStrLn $ "Log query " ++ (show q) ++ " for future use"
     -- TODO: for now, perform the query immediately in IO
     -- In future, I'll want to be able to run it inside Q,
     -- sharing the DB, so I can't run it as a direct
     -- invocation.
-    putStrLn $ "Running uncached query " ++ (show q)
-    v <- runQable q
-    putStrLn $ "Value returned from query: " ++ (show v)
+    liftIO $ putStrLn $ "Running uncached query " ++ (show q)
+    v <- liftIO $ runQable q
+    liftIO $ putStrLn $ "Value returned from query: " ++ (show v)
 
     -- is this new?
-    let rs = previousResultsForQuery db q
+    rs <- previousResultsForQuery q
     if not (v `elem` rs) then do
 
     -- TODO: find any existing Pulls that have requested results
     -- from this query
 
-      putStrLn "Previous db: "
-      print $ previousResults db
-      let newdb = db { previousResults = (previousResults db) ++ [PreviousResult q v] }
-      putStrLn "New db: "
-      print $ previousResults newdb
-      iRunQ newdb (k ())
+      liftIO $ putStrLn "Previous db: "
+      db <- get
+      liftIO $ print $ previousResults db
+      modify (\olddb -> olddb { previousResults = (previousResults db) ++ [PreviousResult q v] })
+      liftIO $ putStrLn "New db: "
+      newdb <- get
+      liftIO $ print $ previousResults newdb
      else do
-      putStrLn "Duplicate result. Not processing as new result"
-      iRunQ db (k ())
+      liftIO $ putStrLn "Duplicate result. Not processing as new result"
+    iRunQ (k ())
 
   (QPull q) :>>= k -> do
-    putStrLn "PULL"
-    putStrLn "Previous results are: "
-    print $ previousResults db
+    liftIO $ putStrLn "PULL"
+    liftIO $ putStrLn "Previous results are: "
+    db <- get
+    liftIO $ print $ previousResults db
 
     -- TODO: look for previously cached results of the correct query
-    let rs = previousResultsForQuery db q
+    rs <- previousResultsForQuery q
 
     -- TODO: register some kind of continuation of k to be run when
     -- new results are encountered
 
-    rrs <- mapM (\v -> iRunQ db (k v)) rs
-    -- BUG: ^ the above does not share DB because map is "parallel"
+    rrs <- mapM (\v -> iRunQ (k v)) rs
     return $ concat rrs
 
   MPlus l -> do
-    rs <- mapM (iRunViewedQ db) l
-    -- BUG: ^ the above does not share DB because map is "parallel"
+    rs <- mapM iRunViewedQ l
+
     return $ concat rs
 
-previousResultsForQuery :: (Qable q a) => DB -> q -> [a]
-previousResultsForQuery db q  = let
-  for = flip map
-  fm = for (previousResults db) $ \(PreviousResult q' a') -> 
-      case (cast q') of
-        Just q'' | q'' == q -> cast a'
-        _ -> Nothing
-  in catMaybes fm
+previousResultsForQuery :: (Qable q a) => q -> StateT DB IO [a]
+previousResultsForQuery q  = do
+  db <- get
+  let
+   for = flip map
+   fm = for (previousResults db) $ \(PreviousResult q' a') -> 
+       case (cast q') of
+         Just q'' | q'' == q -> cast a'
+         _ -> Nothing
+  return $ catMaybes fm
 
 unsafeQT :: IO x -> Q x
 unsafeQT a = singleton $ QT a

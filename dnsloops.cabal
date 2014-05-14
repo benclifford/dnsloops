@@ -7,12 +7,12 @@ Build-Type: Simple
 Cabal-Version: >=1.6
 
 Executable dnsloops
-  Build-depends: base, dns, free-operational
+  Build-depends: base, dns, free-operational, mtl
   main-is: Main.hs
   ghc-options: -main-is Main
 
 Executable dnsloops-test
-  Build-depends: base, free-operational
+  Build-depends: base, free-operational, mtl
   main-is: Test.hs
   ghc-options: -main-is Test
 
