@@ -1,7 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Test where
 
+import Data.Typeable
 import Control.Monad
 
 import Q
@@ -50,14 +52,14 @@ main = do
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)
 
-data StrLenQuery = StrLenQuery String deriving Show
+data StrLenQuery = StrLenQuery String deriving (Show, Eq, Typeable)
 
 
 instance Qable IntegerQuery Int where
   runQable (Inc n) = return (n + 1)
   runQable (Dec n) = return (n - 1)
 
-data IntegerQuery = Inc Int | Dec Int deriving Show
+data IntegerQuery = Inc Int | Dec Int deriving (Show, Eq, Typeable)
 
 
 test :: Q ()

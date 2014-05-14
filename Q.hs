@@ -2,7 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE RankNTypes #-}
-{-X LANGUAGE ImpredicativeTypes #-}
 
 module Q where
 
@@ -11,10 +10,12 @@ import Control.Monad
 import Control.Monad.Operational
 
 import Data.Dynamic
+import Data.Maybe
+import Data.Typeable
 
 -- * The monad on which everything runs
 
-class (Show q, Show a) => Qable q a | q -> a where
+class (Show q, Show a, Eq q, Typeable q, Typeable a) => Qable q a | q -> a where
 
   -- | Run the query in the underlying monad,
   -- giving an answer
@@ -81,10 +82,26 @@ iRunQ db m = case view m of
     putStrLn "PULL"
     putStrLn "Previous results are: "
     print $ previousResults db
-    putStrLn $ "Running uncached query " ++ (show q)
-    v <- runQable q
-    putStrLn $ "Value returned from query: " ++ (show v)
+
+    -- TODO: look for previously cached results of the correct query
+    let rs = previousResultsForQuery db q
+
+    -- TODO: this should be a non-deterministic mplus style fork
+    let v = head rs
+
+--    putStrLn $ "Running uncached query " ++ (show q)
+--    v <- runQable q
+--    putStrLn $ "Value returned from query: " ++ (show v)
     iRunQ db (k v)
+
+previousResultsForQuery :: (Qable q a) => DB -> q -> [a]
+previousResultsForQuery db q  = let
+  for = flip map
+  fm = for (previousResults db) $ \(PreviousResult q' a') -> 
+      case (cast q') of
+        Just q'' | q'' == q -> cast a'
+        _ -> Nothing
+  in catMaybes fm
 
 unsafeQT :: IO x -> Q x
 unsafeQT a = singleton $ QT a
