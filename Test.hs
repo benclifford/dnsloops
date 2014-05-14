@@ -17,18 +17,42 @@ main = do
 
 
   putStrLn "test push and pull a query"
-  r <- runQ $ do
-    let query = StrLenQuery "Hello"
-    qpush query
-    qpull query
+  r <- runQ $ query $ StrLenQuery "Hello"
   putStr "test result: "
   print r
   when (r /= 5) (error "test failed")
+
+  putStrLn "test push and pull another query"
+  r <- runQ $ query $ StrLenQuery "Hello World"
+  putStr "test result: "
+  print r
+  when (r /= 11) (error "test failed")
+
+  putStrLn "test Inc 10"
+  r <- runQ $ query $ Inc 10
+  putStr "test result: "
+  print r
+  when (r /= 11) (error "test failed")
+
+  putStrLn "test Dec 33"
+  r <- runQ $ query $ Dec 33
+  putStr "test result: "
+  print r
+  when (r /= 32) (error "test failed")
+
 
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)
 
 data StrLenQuery = StrLenQuery String deriving Show
+
+
+instance Qable IntegerQuery Int where
+  runQable (Inc n) = return (n + 1)
+  runQable (Dec n) = return (n - 1)
+
+data IntegerQuery = Inc Int | Dec Int deriving Show
+
 
 test :: Q ()
 test = return ()

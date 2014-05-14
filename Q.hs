@@ -4,6 +4,7 @@
 
 module Q where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Operational
 
@@ -53,4 +54,5 @@ qpush q = singleton $ QPush q
 
 qpull q = singleton $ QPull q
 
+query q = qpush q *> qpull q
 
