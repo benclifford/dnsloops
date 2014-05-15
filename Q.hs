@@ -21,9 +21,12 @@ import Data.Typeable
 class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
   => Qable q a | q -> a where
 
-  -- | Run the query in the underlying monad,
-  -- giving an answer
-  runQable :: q -> IO a
+  -- | Run the query. The answer type does not appear in
+  -- the type signature because there is nothing magic
+  -- about the answer type: running the query might push
+  -- many different answers to many different queries in
+  -- addition to this query.
+  runQable :: q -> Q final ()
 
 -- | QInstruction are the simple instructions to be used
 -- inside the operational monad.
@@ -33,8 +36,10 @@ type Q final x = ProgramP (QInstruction final) x
 data QInstruction final x where
   -- runs an action in the underlying IO monad
   QT :: IO r -> QInstruction final r
-  -- | QPush asks for a query to be made without waiting for any answers
-  QPush :: Qable q a => q -> QInstruction final ()
+  -- | Asks for a query to be made without waiting for any answers
+  QLaunch :: Qable q a => q -> QInstruction final ()
+  -- | Records an answer to a query (which might not have been launched...)
+  QRecord :: Qable q a => q -> a -> QInstruction final ()
   -- | QPull asks for the responses to a query without launching that
   --   query. Often it should follow a push, I think, but sometimes not -
   --   for example when looking for cached values.
@@ -103,20 +108,18 @@ iRunViewedQ i = case i of
     v <- lift $ a
     iRunQ (k v)
 
-  (QPush q) :>>= k -> do
-    liftIO $ putStrLn "PUSH"
-    liftIO $ putStrLn $ "Log query " ++ (show q) ++ " for future use"
-    -- TODO: for now, perform the query immediately in IO
-    -- In future, I'll want to be able to run it inside Q,
-    -- sharing the DB, so I can't run it as a direct
-    -- invocation.
-    liftIO $ putStrLn $ "Running uncached query " ++ (show q)
-    v <- liftIO $ runQable q
-    liftIO $ putStrLn $ "Value returned from query: " ++ (show v)
+  (QLaunch q) :>>= k -> do
+    liftIO $ putStrLn "LAUNCH"
+    liftIO $ putStrLn $ "Launching query " ++ (show q)
+    iRunQ (runQable q)
+    iRunQ (k ())
+
+  (QRecord q a) :>>= k -> do
+    liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
     -- is this new?
     rs <- previousResultsForQuery q
-    if not (v `elem` rs) then processNewResult q v
+    if not (a `elem` rs) then processNewResult q a
      else liftIO $ putStrLn "Duplicate result. Not processing as new result"
     iRunQ (k ())
 
@@ -209,10 +212,12 @@ dumpPreviousResults = do
 unsafeQT :: IO x -> Q final x
 unsafeQT a = singleton $ QT a
 
-qpush q = singleton $ QPush q
+qlaunch q = singleton $ QLaunch q
+
+qrecord q a = singleton $ QRecord q a
 
 qpull q = singleton $ QPull q
 
-query q = qpush q *> qpull q
+query q = qlaunch q *> qpull q
 
 pushFinalResult v = singleton $ QPushFinalResult v
