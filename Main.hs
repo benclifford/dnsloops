@@ -1,19 +1,65 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
 module Main where
+
+import Data.ByteString.Char8 (pack)
+import Data.Typeable
+
+import Network.DNS
 
 import Q
 import Control.Monad
 
 -- | terminology from RFC1035
-type Domain = [Label]
+type LDomain = [LLabel]
 
-type Label = String
+type LLabel = String
+
+data ResolverQuery = ResolverQuery ResolvConf Domain TYPE deriving (Show, Eq, Typeable)
+data ResolverAnswer = ResolverAnswer (Either DNSError DNSFormat) deriving (Show, Eq, Typeable)
+
+instance Qable ResolverQuery ResolverAnswer where
+  runQable q@(ResolverQuery rc d t) = do
+    result <- unsafeQT $ do
+      resolver <- makeResolvSeed rc
+      withResolver resolver $ \r -> lookupRaw r d t
+    return ()
+    qrecord q (ResolverAnswer result)
+
+-- | these instances are needed to support Show and Eq on ResolverQuery and ResolverAnswer
+deriving instance Show ResolvConf
+deriving instance Eq ResolvConf
+deriving instance Show FileOrNumericHost
+deriving instance Eq FileOrNumericHost
+
+hostname = pack "www.hawaga.org.uk"
 
 main = do
   putStrLn "DNSLoops main"
-  runQ $ resolve ["www", "hawaga", "org", "uk"]
+
+{-
+  resolver <- makeResolvSeed defaultResolvConf
+  result <- withResolver resolver $ \r -> lookupRaw r hostname A
+  print result 
+-}
+
+--  runQ $ resolve ["www", "hawaga", "org", "uk"]
+
+  res <- runQ simpleQuery
+
+  putStrLn "Final result in Main: "
+  print res
+
+
+simpleQuery = query (ResolverQuery defaultResolvConf hostname A)
+
+
+
 
 -- | this should return the IP addresses the named host
-resolve :: Domain -> Q () ()
+resolve :: LDomain -> Q () ()
 resolve domain = do
   report ("Resolving " ++ (show domain))
 
@@ -70,12 +116,12 @@ resolve domain = do
   -}
 
 
-isCached :: Domain -> Q any Bool
+isCached :: LDomain -> Q any Bool
 isCached _ = return False
 
 report :: String -> Q any ()
 report s = unsafeQT $ putStrLn s
 
-getAncestorNameServer :: Domain -> Q any Domain
+getAncestorNameServer :: LDomain -> Q any LDomain
 getAncestorNameServer domain = return ["a","root-servers","net"]
 
