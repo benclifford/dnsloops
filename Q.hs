@@ -90,22 +90,19 @@ iRunViewedQ i = case i of
     -- TODO: find any existing Pulls that have requested results
     -- from this query
 
-      liftIO $ putStrLn "Previous db: "
-      db <- get
-      liftIO $ print $ previousResults db
-      modify (\olddb -> olddb { previousResults = (previousResults db) ++ [PreviousResult q v] })
-      liftIO $ putStrLn "New db: "
-      newdb <- get
-      liftIO $ print $ previousResults newdb
+      dumpPreviousResults
+
+      modify (\olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] })
+
+      dumpPreviousResults
+
      else do
       liftIO $ putStrLn "Duplicate result. Not processing as new result"
     iRunQ (k ())
 
   (QPull q) :>>= k -> do
     liftIO $ putStrLn "PULL"
-    liftIO $ putStrLn "Previous results are: "
-    db <- get
-    liftIO $ print $ previousResults db
+    dumpPreviousResults
 
     -- TODO: look for previously cached results of the correct query
     rs <- previousResultsForQuery q
@@ -116,6 +113,7 @@ iRunViewedQ i = case i of
     rrs <- mapM (\v -> iRunQ (k v)) rs
     return $ concat rrs
 
+  -- | mplus should follow the left distribution law
   MPlus l -> do
     rs <- mapM iRunViewedQ l
 
@@ -131,6 +129,12 @@ previousResultsForQuery q  = do
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
   return $ catMaybes fm
+
+dumpPreviousResults :: StateT DB IO ()
+dumpPreviousResults = do
+      liftIO $ putStrLn "Previous results: "
+      db <- get
+      liftIO $ print $ previousResults db
 
 unsafeQT :: IO x -> Q x
 unsafeQT a = singleton $ QT a
