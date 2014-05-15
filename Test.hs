@@ -63,13 +63,12 @@ main = do
   print r
   when ( r /= [16] ) $ error "test failed"
 
-{-
   putStrLn "A pull and a push in mplus-style parallel"
   r <- runQ $ (qpull (Inc 15)) `mplus` (qpush (Inc 15) >> mzero)
   putStrLn "Test result: "
   print r
   when ( r /= [16] ) $ error "test failed"
--}
+
 
 instance Qable StrLenQuery Int where
   runQable (StrLenQuery s) = return (length s)
@@ -83,7 +82,4 @@ instance Qable IntegerQuery Int where
 
 data IntegerQuery = Inc Int | Dec Int deriving (Show, Eq, Typeable)
 
-
-test :: Q ()
-test = return ()
 

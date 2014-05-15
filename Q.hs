@@ -2,6 +2,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Q where
 
@@ -26,18 +28,19 @@ class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
 -- | QInstruction are the simple instructions to be used
 -- inside the operational monad.
 
-type Q x = ProgramP QInstruction x
+type Q final x = ProgramP (QInstruction final) x
 
-data QInstruction x where
+data QInstruction final x where
   -- runs an action in the underlying IO monad
-  QT :: IO x -> QInstruction x
+  QT :: IO r -> QInstruction final r
   -- | QPush asks for a query to be made without waiting for any answers
-  QPush :: Qable q a => q -> QInstruction ()
+  QPush :: Qable q a => q -> QInstruction final ()
   -- | QPull asks for the responses to a query without launching that
   --   query. Often it should follow a push, I think, but sometimes not -
   --   for example when looking for cached values.
   -- but what should the type of this look like?
-  QPull :: Qable q a => q -> QInstruction a
+  QPull :: (Typeable final, Qable q a) => q -> QInstruction final a
+  QPushFinalResult :: final -> QInstruction final ()
 
 -- * DB bits
 
@@ -47,26 +50,55 @@ data PreviousResult where
 instance Show PreviousResult where 
   show (PreviousResult q a) = "Query " ++ (show q) ++ " => " ++ (show a)
 
-data DB = DB { previousResults :: [PreviousResult] }
+-- | a previous pull request. We can restart but only a computation that
+-- eventually ends with no useful value returned. Potentially we could be
+-- returning a value and discarding it, but using () makes it clearer
+-- in the type system that there cannot be a value.
+data PreviousPull final where
+  PreviousPull :: forall final . forall q . forall a . (Typeable final, Qable q a) => q -> PPQ final a -> PreviousPull final
+  -- PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
+
+-- | this is a wrapper that gives a Typeable instance for a -> Q ()
+-- because using that type on its own wasn't Typeable
+data PPQ final a = PPQ (a -> Q final ()) deriving Typeable
+
+
+data DB final = DB {
+    previousResults :: [PreviousResult],
+    previousPulls :: [PreviousPull final],
+    finalResults :: [final]
+  }
 
 emptyDB = DB {
-    previousResults = []
+    previousResults = [],
+    previousPulls = [],
+    finalResults = []
   }
 
 
 
 -- * The interpreter
 
-runQ :: Q x -> IO [x]
-runQ m = evalStateT (iRunQ m) emptyDB
+runQ :: Q final final -> IO [final]
+runQ m = do
+  let p = do
+             r <- m
+             pushFinalResult r
+  db <- execStateT (iRunQ p) emptyDB
+  return $ finalResults db
 
-iRunQ :: Q x -> StateT DB IO [x]
+iRunQ :: Q final x -> StateT (DB final) IO [x]
 iRunQ m = iRunViewedQ (view m)
 
-iRunViewedQ :: ProgramViewP QInstruction x -> StateT DB IO [x]
+iRunViewedQ :: ProgramViewP (QInstruction final) x -> StateT (DB final) IO [x]
 iRunViewedQ i = case i of
 
   Return v -> return [v]
+
+  (QPushFinalResult v) :>>= k -> do
+    liftIO $ putStrLn "Pushing a final result"
+    modify $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
+    iRunQ (k ())
 
   (QT a) :>>= k -> do
     v <- lift $ a
@@ -85,32 +117,34 @@ iRunViewedQ i = case i of
 
     -- is this new?
     rs <- previousResultsForQuery q
-    if not (v `elem` rs) then do
-
-    -- TODO: find any existing Pulls that have requested results
-    -- from this query
-
-      dumpPreviousResults
-
-      modify $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] }
-
-      dumpPreviousResults
-
-     else do
-      liftIO $ putStrLn "Duplicate result. Not processing as new result"
+    if not (v `elem` rs) then processNewResult q v
+     else liftIO $ putStrLn "Duplicate result. Not processing as new result"
     iRunQ (k ())
 
   (QPull q) :>>= k -> do
     liftIO $ putStrLn "PULL"
     dumpPreviousResults
 
-    -- TODO: look for previously cached results of the correct query
-    rs <- previousResultsForQuery q
 
     -- TODO: register some kind of continuation of k to be run when
     -- new results are encountered
+    -- BUG? The rest of the program may come up with other results
+    -- so I need to register the new callback before running the
+    -- rest of the program for existing results
+    -- TODO: make a test case to exercise this subtlety
 
+--  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
+    let callback = PreviousPull q (PPQ (\a -> k a >> return ()))
+
+    modify $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
+
+    -- run the rest of the program for every result that is
+    -- already known. This may results in the above callback
+    -- being invoked, if relevant pushes happen.
+    liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
+    rs <- previousResultsForQuery q
     rrs <- mapM (\v -> iRunQ (k v)) rs
+
     return $ concat rrs
 
   -- | mplus should follow the left distribution law
@@ -119,24 +153,61 @@ iRunViewedQ i = case i of
 
     return $ concat rs
 
-previousResultsForQuery :: (Qable q a) => q -> StateT DB IO [a]
+processNewResult :: (Qable q a) => q -> a -> StateT (DB x) IO ()
+processNewResult q v = do
+  dumpPreviousResults
+  -- TODO: find any existing Pulls that have requested results
+  -- from this query.
+
+  -- There is probably ordering subtlety here about when the
+  -- callback list is acquired, vs when the callbacks are made,
+  -- vs when the result is added as a previous result.
+  -- TODO: ^ tests to check that subtlety
+
+  modify $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] }
+
+  cbs <- previousPullsForQuery q
+
+  liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
+  mapM_ (\(PPQ f) -> iRunQ (f v)) cbs 
+
+  dumpPreviousResults
+
+
+previousResultsForQuery :: (Qable q a) => q -> StateT (DB x) IO [a]
 previousResultsForQuery q  = do
   db <- get
-  let
-   for = flip map
-   fm = for (previousResults db) $ \(PreviousResult q' a') -> 
+  let fm = for (previousResults db) $ \(PreviousResult q' a') -> 
        case (cast q') of
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
   return $ catMaybes fm
 
-dumpPreviousResults :: StateT DB IO ()
+--  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
+
+previousPullsForQuery :: (Qable q a) => q -> StateT (DB final) IO [PPQ final a]
+previousPullsForQuery q = do
+  db <- get
+  let fm = for (previousPulls db) $ \r@(PreviousPull q' a') ->
+       case (cast q') of
+         Just q'' | q'' == q -> cast a'
+         _ -> Nothing
+  return $ catMaybes fm
+
+-- TODO: can the PreviousResult and PreviousPull types be
+-- turned into some query-referenced shared type with a
+-- parameter for the RHS? Then the above two functions
+-- could share most of the implementation.
+
+for = flip map
+
+dumpPreviousResults :: StateT (DB x) IO ()
 dumpPreviousResults = do
       liftIO $ putStrLn "Previous results: "
       db <- get
       liftIO $ print $ previousResults db
 
-unsafeQT :: IO x -> Q x
+unsafeQT :: IO x -> Q final x
 unsafeQT a = singleton $ QT a
 
 qpush q = singleton $ QPush q
@@ -145,3 +216,4 @@ qpull q = singleton $ QPull q
 
 query q = qpush q *> qpull q
 
+pushFinalResult v = singleton $ QPushFinalResult v

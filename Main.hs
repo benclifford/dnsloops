@@ -13,7 +13,7 @@ main = do
   runQ $ resolve ["www", "hawaga", "org", "uk"]
 
 -- | this should return the IP addresses the named host
-resolve :: Domain -> Q ()
+resolve :: Domain -> Q () ()
 resolve domain = do
   report ("Resolving " ++ (show domain))
 
@@ -70,12 +70,12 @@ resolve domain = do
   -}
 
 
-isCached :: Domain -> Q Bool
+isCached :: Domain -> Q any Bool
 isCached _ = return False
 
-report :: String -> Q ()
+report :: String -> Q any ()
 report s = unsafeQT $ putStrLn s
 
-getAncestorNameServer :: Domain -> Q Domain
+getAncestorNameServer :: Domain -> Q any Domain
 getAncestorNameServer domain = return ["a","root-servers","net"]
 
