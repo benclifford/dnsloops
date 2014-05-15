@@ -56,7 +56,6 @@ instance Show PreviousResult where
 -- in the type system that there cannot be a value.
 data PreviousPull final where
   PreviousPull :: forall final . forall q . forall a . (Typeable final, Qable q a) => q -> PPQ final a -> PreviousPull final
-  -- PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
 
 -- | this is a wrapper that gives a Typeable instance for a -> Q ()
 -- because using that type on its own wasn't Typeable
