@@ -3,6 +3,7 @@
 
 module Test where
 
+import Data.List
 import Data.Typeable
 import Control.Monad
 
@@ -69,6 +70,14 @@ main = do
   print r
   when ( r /= [16] ) $ error "test failed"
 
+  putStrLn "Query ArbA"
+  r <- runQ $ (query ArbA)
+  when (r /= [ArbRes "Hi"]) (error "test failed")
+
+  putStrLn "Query ArbB mplus query ArbA"
+  r <- runQ $ ((query ArbB >> mzero) `mplus` query ArbA)
+  when (sort r /= sort [ArbRes "Hello", ArbRes "Hi"]) (error $ "test failed. got " ++ (show r))
+
 
 instance Qable StrLenQuery Int where
   runQable q@(StrLenQuery s) = qrecord q (length s)
@@ -82,4 +91,11 @@ instance Qable IntegerQuery Int where
 
 data IntegerQuery = Inc Int | Dec Int deriving (Show, Eq, Typeable)
 
+
+data ArbQuery = ArbA | ArbB deriving (Show, Eq, Typeable)
+data ArbRes = ArbRes String deriving (Show, Eq, Typeable, Ord)
+
+instance Qable ArbQuery ArbRes where
+  runQable ArbA = qrecord ArbA (ArbRes "Hi")
+  runQable ArbB = qrecord ArbB (ArbRes "Bye") >> qrecord ArbA (ArbRes "Hello")
 
