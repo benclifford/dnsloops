@@ -92,7 +92,7 @@ iRunViewedQ i = case i of
 
       dumpPreviousResults
 
-      modify (\olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] })
+      modify $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] }
 
       dumpPreviousResults
 
