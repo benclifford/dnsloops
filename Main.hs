@@ -28,13 +28,25 @@ instance Qable ResolverQuery ResolverAnswer where
     return ()
     qrecord q (ResolverAnswer result)
 
+
+data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable)
+data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
+
+instance Qable GetNameserverQuery GetNameserverAnswer where
+  runQable q@(GetNameserverQuery d) = do
+    result <- unsafeQT $ do
+      resolver <- makeResolvSeed defaultResolvConf
+      withResolver resolver $ \r -> lookupNS r d
+    case result of
+      Right nameservers -> forM_ nameservers $ \ns -> qrecord q (GetNameserverAnswer ns)
+      Left _ -> return () -- TODO: what should I do in the case of error? depends on the error. For now, silent discard
+
 -- | these instances are needed to support Show and Eq on ResolverQuery and ResolverAnswer
 deriving instance Show ResolvConf
 deriving instance Eq ResolvConf
 deriving instance Show FileOrNumericHost
 deriving instance Eq FileOrNumericHost
 
-hostname = pack "www.hawaga.org.uk"
 
 main = do
   putStrLn "DNSLoops main"
@@ -47,16 +59,38 @@ main = do
 
 --  runQ $ resolve ["www", "hawaga", "org", "uk"]
 
-  res <- runQ simpleQuery
+  let hostname = pack "www.hawaga.org.uk"
+
+  putStrLn "============ Test 1 ============"
+  res <- runQ (simpleQuery hostname)
+  putStrLn "Final result in Main: "
+  print res
+
+  putStrLn "============ Test 2 ============"
+  res <- runQ (complexResolve hostname)
 
   putStrLn "Final result in Main: "
   print res
 
 
-simpleQuery = query (ResolverQuery defaultResolvConf hostname A)
+simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
+complexResolve hostname = do
+  -- TODO: prepopulate our seatbelt root resolver information,
+  -- a subset of /domain/named.cache
+{- 
+.                        3600000  IN  NS    A.ROOT-SERVERS.NET.
+A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
+A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
+-}
+  -- TODO: push empty domain name has NS "a.root-servers.net"
+  -- TODO: push "a.root-servers.net" has A 198.41.0.4
 
+  -- then begin the resolver algorithm by finding all NS records
+  -- for all suffixes of the domain name (including the
+  -- empty one)
 
+  return ()
 
 -- | this should return the IP addresses the named host
 resolve :: LDomain -> Q () ()
