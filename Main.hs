@@ -4,6 +4,7 @@
 
 module Main where
 
+import Control.Applicative
 import Data.ByteString.Char8 (pack)
 import Data.Typeable
 
@@ -67,7 +68,7 @@ main = do
   print res
 
   putStrLn "============ Test 2 ============"
-  res <- runQ (complexResolve hostname)
+  res <- runQ $ populateRootHints <|> (complexResolve hostname)
 
   putStrLn "Final result in Main: "
   print res
@@ -75,7 +76,7 @@ main = do
 
 simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
-complexResolve hostname = do
+populateRootHints = qrecord (GetNameserverQuery $ pack "") (GetNameserverAnswer $ pack "a.root-servers.net") *> empty
   -- TODO: prepopulate our seatbelt root resolver information,
   -- a subset of /domain/named.cache
 {- 
@@ -83,9 +84,11 @@ complexResolve hostname = do
 A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
-  -- TODO: push empty domain name has NS "a.root-servers.net"
   -- TODO: push "a.root-servers.net" has A 198.41.0.4
 
+
+complexResolve hostname = do
+  
   -- then begin the resolver algorithm by finding all NS records
   -- for all suffixes of the domain name (including the
   -- empty one)
