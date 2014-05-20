@@ -5,7 +5,8 @@
 module Main where
 
 import Control.Applicative
-import Data.ByteString.Char8 (pack)
+import Data.ByteString.Char8 (pack, split)
+import Data.List (tails)
 import Data.Typeable
 
 import Network.DNS
@@ -77,6 +78,7 @@ main = do
 simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
 populateRootHints = qrecord (GetNameserverQuery $ pack "") (GetNameserverAnswer $ pack "a.root-servers.net") *> empty
+-- I wonder if qrecord should end empty/mzero rather than returning a single () ?
   -- TODO: prepopulate our seatbelt root resolver information,
   -- a subset of /domain/named.cache
 {- 
@@ -88,7 +90,11 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 
 
 complexResolve hostname = do
-  
+
+  let shreddedDomain = split '.' hostname 
+  let domainSuffixes = tails shreddedDomain
+  report $ "Domain suffixes: " ++ (show domainSuffixes)
+ 
   -- then begin the resolver algorithm by finding all NS records
   -- for all suffixes of the domain name (including the
   -- empty one)
