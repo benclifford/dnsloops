@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Applicative
-import Data.ByteString.Char8 (pack, split)
+import Data.ByteString.Char8 (pack, split, intercalate)
 import Data.Foldable (asum, Foldable)
 import Data.List (tails)
 import Data.Typeable
@@ -96,14 +96,19 @@ forA_ l f = asum (fmap f l)
 complexResolve hostname = do
 
   let shreddedDomain = split '.' hostname 
+  -- ^ BUG; handling of . inside labels
   let domainSuffixes = tails shreddedDomain
   report $ "Domain suffixes: " ++ (show domainSuffixes)
 
-  forA_ domainSuffixes $ \domainSuffix -> empty
- 
-  -- then begin the resolver algorithm by finding all NS records
-  -- for all suffixes of the domain name (including the
-  -- empty one)
+  forA_ domainSuffixes $ \domainSuffix -> do
+    let domainSuffixByteString = intercalate (pack ".") domainSuffix
+    -- ^ BUG: handling of . inside labels
+    -- cache lookup
+    ns <- qpull (GetNameserverQuery $ domainSuffixByteString)
+    report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
+    empty
+
+  -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.
 
   return ()
 
