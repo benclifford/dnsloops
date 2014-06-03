@@ -7,6 +7,7 @@ module Main where
 import Control.Applicative
 import Data.ByteString.Char8 (pack, split, intercalate)
 import Data.Foldable (asum, Foldable)
+import Data.IP
 import Data.List (tails)
 import Data.Typeable
 
@@ -31,6 +32,12 @@ instance Qable ResolverQuery ResolverAnswer where
     return ()
     qrecord q (ResolverAnswer result)
 
+-- TODO: this can hopefully supercede GetNameserver more generally.
+data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
+data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
+
+instance Qable GetRRSetQuery GetRRSetAnswer where
+  runQable q = error "Qable GetRRSetQuery NOTIMPL"
 
 data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable)
 data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
@@ -78,7 +85,15 @@ main = do
 
 simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
-populateRootHints = qrecord (GetNameserverQuery $ pack "") (GetNameserverAnswer $ pack "a.root-servers.net") *> empty
+populateRootHints = 
+      (qrecord (GetNameserverQuery $ pack "")
+               (GetNameserverAnswer $ pack "a.root-servers.net") *> empty)
+  <|> (qrecord (GetRRSetQuery aName A)
+               (GetRRSetAnswer $ Right [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
+  where aName = pack "a.root-servers.net"
+        aIP = toIPv4 [198,41,0,4]
+        noLen = -1
+
 -- I wonder if qrecord should end empty/mzero rather than returning a single () ?
 -- Its probably nice to be able to use it sequentially in a do block though?
   -- TODO: prepopulate our seatbelt root resolver information,
@@ -88,7 +103,6 @@ populateRootHints = qrecord (GetNameserverQuery $ pack "") (GetNameserverAnswer 
 A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
-  -- TODO: push "a.root-servers.net" has A 198.41.0.4
 
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
@@ -104,8 +118,23 @@ complexResolve hostname = do
     let domainSuffixByteString = intercalate (pack ".") domainSuffix
     -- ^ BUG: handling of . inside labels
     -- cache lookup
-    ns <- qpull (GetNameserverQuery $ domainSuffixByteString)
+
+    -- there's subtlety here that I haven't quite figured out
+    -- to do with how I want to branch over all the nameservers in an
+    -- RRset, and then over all the A records of all those nameservers
+    -- and return a failure in the case of all of them failing. So its
+    -- not a pure fork but needs some join back in, perhaps a Join
+    -- uniquely numbered query type or some such? Not sure...
+
+    (GetNameserverAnswer ns) <- qpull (GetNameserverQuery domainSuffixByteString)
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
+
+    -- this should be a recursive launch, I think, rather than only a pull
+    (GetRRSetAnswer (Right alist)) <- qpull (GetRRSetQuery ns A)
+
+    forA_ alist $ \arec -> do
+      report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
+
     empty
 
   -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.
