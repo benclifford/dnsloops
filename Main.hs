@@ -86,11 +86,12 @@ main = do
 simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
 populateRootHints = 
-      (qrecord (GetNameserverQuery $ pack "")
-               (GetNameserverAnswer $ pack "a.root-servers.net") *> empty)
+      (qrecord (GetNameserverQuery rootName)
+               (GetNameserverAnswer aName) *> empty)
   <|> (qrecord (GetRRSetQuery aName A)
                (GetRRSetAnswer $ Right [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
-  where aName = pack "a.root-servers.net"
+  where rootName = pack ""
+        aName = pack "a.root-servers.net"
         aIP = toIPv4 [198,41,0,4]
         noLen = -1
 
