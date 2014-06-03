@@ -143,6 +143,7 @@ complexResolve hostname = do
   return ()
 
 -- | this should return the IP addresses the named host
+{-
 resolve :: LDomain -> Q () ()
 resolve domain = do
   report ("Resolving " ++ (show domain))
@@ -203,9 +204,13 @@ resolve domain = do
 isCached :: LDomain -> Q any Bool
 isCached _ = return False
 
+-}
+
 report :: String -> Q any ()
 report s = unsafeQT $ putStrLn s
 
+{-
 getAncestorNameServer :: LDomain -> Q any LDomain
 getAncestorNameServer domain = return ["a","root-servers","net"]
+-}
 
