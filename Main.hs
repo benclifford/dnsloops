@@ -14,6 +14,8 @@ import Data.Typeable
 
 import Network.DNS
 
+import System.Environment (getArgs)
+
 import Q
 import Control.Monad
 
@@ -71,7 +73,9 @@ main = do
 
 --  runQ $ resolve ["www", "hawaga", "org", "uk"]
 
-  let hostname = pack "www.hawaga.org.uk"
+  [h] <- getArgs
+
+  let hostname = pack h
 
   putStrLn "============ Test 1 ============"
   res <- runQ (simpleQuery hostname)
