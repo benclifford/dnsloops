@@ -135,6 +135,7 @@ complexResolve qname qrrtype = do
     -- not a pure fork but needs some join back in, perhaps a Join
     -- uniquely numbered query type or some such? Not sure...
 
+    report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
     (GetNameserverAnswer ns) <- qpull (GetNameserverQuery domainSuffixByteString)
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
 
@@ -156,7 +157,7 @@ complexResolve qname qrrtype = do
       (ResolverAnswer r) <- query $ ResolverQuery
         (defaultResolvConf { resolvInfo = RCHostName rd })
         qname qrrtype
-      report $ "A resolver result is " ++ (show r)
+      report $ "When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
       -- so this might be our answer! (one day)
       -- or more likely its a delegation - what does that look like according
@@ -179,17 +180,54 @@ complexResolve qname qrrtype = do
       -- TODO: check the delegation is for somewhere between the name
       -- server we just queried and the end hostname
 
+      -- TODO: is it appropriate to be doing this here or
+      -- in the response bit of ResolverAnswer?
+      -- If I'm only making resolver queries in one place, I guess
+      -- it doesn't matter, but I want this cache behaviour to
+      -- happen for every query, not just ones that I happen to have
+      -- decided to pull for in this code block. So maybe it should
+      -- move in there.
+
       case r of 
         (Right df) | (rcode . flags . header) df == NoErr
                    , answer df == []
                    , nub (rrtype <$> (authority df)) == [NS]
                    , [delegzone] <- (nub (rrname <$> (authority df)))
-          ->    (report $ "DELEGATION to zone " ++ (show delegzone) ++ ": " ++ (show $ authority df)) 
-             *> forA_ (rdata <$> (authority df)) (\rd -> 
+          ->    (report $ "DELEGATION of zone " ++ (show delegzone) ++ ": " ++ (show $ authority df)) 
+             *> ((forA_ (rdata <$> (authority df)) (\rd -> 
+                         (report $ "DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
                          (qrecord (GetNameserverQuery $ pack $ dropdot $ unpack delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
                                   (GetNameserverAnswer (pack $ dropdot $ show rd)) *> empty))
-             -- TODO: we also have some additional data to validate and cache - the glue.
-             -- do that in parallel <|> with the above forA_ not sequentially...
+                )
+              <|>
+                (
+                 -- TODO now this is a bit weird: I don't necessary want to
+                 -- go parallel for each record: I want to make up, potentially,
+                 -- grouped rrsets (grouped by rrname/rrtype) and go parallel
+                 -- over those. Although in practice do I ever see the same
+                 -- rrname/rrtype more than once in additional data?
+                 -- At least put a check in for it and give a WARNING about
+                 -- unhandled behaviour
+                 forA_ (additional df) (\ad -> 
+                      (report $ "DELEGATION ADDITIONAL DATA: " ++ (show ad))
+  
+                   *> (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname ad) (rrtype ad))
+                               (GetRRSetAnswer (Right [ad])) -- TODO: see above TODO: if I've grouped by rrname/rrtype, this list may have more than one entry
+                      )
+{-
+
+-- TODO: this can hopefully supercede GetNameserver more generally.
+data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
+data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
+
+
+-}
+                 *> empty
+                  ) 
+                 *>
+                   -- TODO: we also have some additional data to validate and push into the db
+                empty
+               ))
              *> empty
         _ -> (report $ "UNEXPECTED: " ++ (show r)) *> empty -- TODO something more interesting here
 
