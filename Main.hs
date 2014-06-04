@@ -372,3 +372,11 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 
 -- TODO: deal with truncation
 
+-- TODO: rfc2181 s5 : check if any RRSet contains duplicates and give warning
+
+-- TODO: rfc2181 s5.2: different TTLs for records in RRset is deprecated.
+--    check for that and warn (actually 5.2 says it should be treated as
+--    an error, so then I should make that potentially stop resolving, as
+--    well as continuing)
+
+
