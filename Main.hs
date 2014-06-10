@@ -116,6 +116,7 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
 
+complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
 complexResolve qname qrrtype = do
 
   let shreddedDomain = split '.' qname 
