@@ -55,6 +55,15 @@ data QInstruction final x where
 
 -- * DB bits
 
+data PreviousLaunch where
+  PreviousLaunch :: forall q . forall a . (Qable q a) => q -> PreviousLaunch
+
+deriving instance Show PreviousLaunch
+
+instance Eq PreviousLaunch where
+  (PreviousLaunch l) == (PreviousLaunch r) =
+    Just l == cast r
+
 data PreviousResult where
   PreviousResult :: forall q . forall a . (Qable q a) => q -> a -> PreviousResult
 
@@ -72,14 +81,15 @@ data PreviousPull final where
 -- because using that type on its own wasn't Typeable
 data PPQ final a = PPQ (a -> Q final ()) deriving Typeable
 
-
 data DB final = DB {
+    previousLaunches :: [PreviousLaunch],
     previousResults :: [PreviousResult],
     previousPulls :: [PreviousPull final],
     finalResults :: [final]
   }
 
 emptyDB = DB {
+    previousLaunches = [],
     previousResults = [],
     previousPulls = [],
     finalResults = []
@@ -116,8 +126,20 @@ iRunViewedQ i = case i of
 
   (QLaunch q) :>>= k -> do
     liftIO $ putStrLn "LAUNCH"
-    liftIO $ putStrLn $ "Launching query " ++ (show q)
-    iRunQ (runQable q)
+    prevs <- previousLaunches <$> get
+    liftIO $ putStr "Previously launched queries: "
+    liftIO $ print prevs
+    -- TODO: check if q is an element of prevs,
+    -- using typeable set stuff.
+    let newLaunchPL = PreviousLaunch q
+    if not (newLaunchPL `elem` prevs) then do
+      liftIO $ putStrLn $ "Launching query " ++ (show q)
+      modify $ \olddb -> olddb { previousLaunches = (previousLaunches olddb) ++ [newLaunchPL] }
+      iRunQ (runQable q)
+      return ()
+     else do
+      liftIO $ putStrLn $ "Duplicate query submission. Not launching again."
+      return ()
     iRunQ (k ())
 
   (QRecord q a) :>>= k -> do
