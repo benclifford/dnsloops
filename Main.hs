@@ -399,3 +399,5 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 
 -- TODO: examine SOA fields: validate SMTP is listening on the listening port? validate that the SOA master field is a nameserver in the NS records. Potentially use that SOA master as another nameserver if it is not so described, which could generate a low-priority warning. (esp if it reveals inconsistencies) - that bit is more linty rather than actual errors.
 
+-- TODO: examine authoritative servers and see if they advertise recursion available. linty-warning if they do.
+
