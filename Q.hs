@@ -126,6 +126,7 @@ iRunViewedQ i = case i of
 
   (QLaunch q) :>>= k -> do
     liftIO $ putStrLn "LAUNCH"
+    liftIO $ putStrLn $ "Requested query to launch: " ++ (show q)
     prevs <- previousLaunches <$> get
     liftIO $ putStr "Previously launched queries: "
     liftIO $ print prevs
