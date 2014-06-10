@@ -40,7 +40,14 @@ data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
 data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
 
 instance Qable GetRRSetQuery GetRRSetAnswer where
-  runQable q = error "Qable GetRRSetQuery NOTIMPL"
+  runQable q@(GetRRSetQuery d ty) =
+    (report $  "Launching complex resolve for GetRRSetQuery: " ++ (show d) ++ " " ++ (show ty))
+    <|>
+    complexResolve d ty
+    -- TODO: do I need this empty on the end?
+    -- I'm unclear in general about when returning a () vs
+    -- returning empty makes sense.
+    -- TODO: what to do with the results?
 
 data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable)
 data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
@@ -147,8 +154,7 @@ complexResolve qname qrrtype = do
     (GetNameserverAnswer ns) <- qpull (GetNameserverQuery domainSuffixByteString)
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
 
-    -- this should be a recursive launch, I think, rather than only a pull
-    (GetRRSetAnswer (Right alist)) <- qpull (GetRRSetQuery ns A)
+    (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
 
     forA_ alist $ \arec -> do
       report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
