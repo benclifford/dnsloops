@@ -128,8 +128,8 @@ iRunViewedQ i = case i of
     liftIO $ putStrLn "LAUNCH"
     liftIO $ putStrLn $ "Requested query to launch: " ++ (show q)
     prevs <- previousLaunches <$> get
-    liftIO $ putStr "Previously launched queries: "
-    liftIO $ print prevs
+    -- liftIO $ putStr "Previously launched queries: "
+    -- liftIO $ print prevs
     -- TODO: check if q is an element of prevs,
     -- using typeable set stuff.
     let newLaunchPL = PreviousLaunch q
@@ -154,7 +154,7 @@ iRunViewedQ i = case i of
 
   (QPull q) :>>= k -> do
     liftIO $ putStrLn "PULL"
-    dumpPreviousResults
+    -- dumpPreviousResults
 
 
     -- TODO: register some kind of continuation of k to be run when
@@ -186,7 +186,7 @@ iRunViewedQ i = case i of
 
 processNewResult :: (Qable q a) => q -> a -> StateT (DB x) IO ()
 processNewResult q v = do
-  dumpPreviousResults
+  -- dumpPreviousResults
   -- TODO: find any existing Pulls that have requested results
   -- from this query.
 
@@ -202,7 +202,7 @@ processNewResult q v = do
   liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
   mapM_ (\(PPQ f) -> iRunQ (f v)) cbs 
 
-  dumpPreviousResults
+  -- dumpPreviousResults
 
 
 previousResultsForQuery :: (Qable q a) => q -> StateT (DB x) IO [a]

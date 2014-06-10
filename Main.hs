@@ -32,8 +32,10 @@ instance Qable ResolverQuery ResolverAnswer where
     result <- unsafeQT $ do
       resolver <- makeResolvSeed rc
       withResolver resolver $ \r -> lookupRaw r d t
-    return () -- TODO: whats this return () for? I think its dead code.
-    qrecord q (ResolverAnswer result)
+    -- we record the answer but we also shred it up and cache
+    -- other things it might be an answer to.
+    (qrecord q (ResolverAnswer result))
+      <|> cacheResolverAnswer d t result -- TODO: this probably needs more info about the query in order to perform validation.
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
@@ -93,7 +95,7 @@ main = do
   print res
 
   putStrLn "============ Test 2 ============"
-  res <- runQ $ populateRootHints <|> (complexResolve hostname A)
+  res <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname A)
 
   putStrLn "Final result in Main: "
   print res
@@ -123,6 +125,7 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 
 -- | for-alternative: rather than performing actions using applicative
 -- sequence, perform them using alternative <|>
+-- (c.f. for in Traversable (?))
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
 
@@ -171,8 +174,35 @@ complexResolve qname qrrtype = do
       (ResolverAnswer r) <- query $ ResolverQuery
         (defaultResolvConf { resolvInfo = RCHostName rd })
         qname qrrtype
-      report $ "When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
+      report $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
+
+      case r of 
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , answer df == []
+                   , nub (rrtype <$> (authority df)) == [NS]
+                   , [delegzone] <- (nub (rrname <$> (authority df)))
+          ->  report $ "complexResolve: can ignore delegation"
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , ans <- answer df
+                   , ans /= []
+          -> do
+               report $ "complexResolve: processing answer records (NOTIMPL) " ++ (show $ ans)
+               empty
+               -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
+
+        _ -> (report $ "complexResolve: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
+
+    empty
+
+  -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
+
+  return ()
+
+
+
+
+cacheResolverAnswer qname qrrtype r = do
       -- so this might be our answer! (one day)
       -- or more likely its a delegation - what does that look like according
       -- to the spec? My informal understanding is we get 
@@ -202,14 +232,16 @@ complexResolve qname qrrtype = do
       -- decided to pull for in this code block. So maybe it should
       -- move in there.
 
+      -- TODO: this case needs splitting into functions for
+      -- readability
       case r of 
         (Right df) | (rcode . flags . header) df == NoErr
                    , answer df == []
                    , nub (rrtype <$> (authority df)) == [NS]
                    , [delegzone] <- (nub (rrname <$> (authority df)))
-          ->    (report $ "DELEGATION of zone " ++ (show delegzone) ++ ": " ++ (show $ authority df)) 
-             *> ((forA_ (rdata <$> (authority df)) (\rd -> 
-                         (report $ "DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
+          ->    (report $ "cacheResolverAnswer: This answer is a DELEGATION of zone " ++ (show delegzone))
+              <|> (forA_ (rdata <$> (authority df)) (\rd -> 
+                         (report $ "cacheResolverAnswer: DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
                          (qrecord (GetNameserverQuery $ pack $ dropdot $ unpack delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
                                   (GetNameserverAnswer (pack $ dropdot $ show rd)) *> empty))
                 )
@@ -223,7 +255,7 @@ complexResolve qname qrrtype = do
                  -- At least put a check in for it and give a WARNING about
                  -- unhandled behaviour
                  forA_ (additional df) (\ad -> 
-                      (report $ "DELEGATION ADDITIONAL DATA: " ++ (show ad))
+                      (report $ "cacheResolverAnswer: DELEGATION ADDITIONAL DATA: " ++ (show ad))
   
                    *> (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname ad) (rrtype ad))
                                (GetRRSetAnswer (Right [ad])) -- TODO: see above TODO: if I've grouped by rrname/rrtype, this list may have more than one entry
@@ -241,15 +273,29 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                  *>
                    -- TODO: we also have some additional data to validate and push into the db
                 empty
-               ))
+               )
              *> empty
-        _ -> (report $ "UNEXPECTED: " ++ (show r)) *> empty -- TODO something more interesting here
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , ans <- answer df
+                   , ans /= []
+          -> do
+               report $ "Processing answer records: " ++ (show $ ans)
+               -- TODO: group the answers into RRSets of common name and type, rather than pushing RRSet answers as individual rows.
+               forA_ ans (\rr ->
+                 (report $ "cacheResolverAnswer: ANSWER (improperly formed rrset due to my bad code)" ++ show rr)
+                <|>
+                 (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname rr) (rrtype rr)) (GetRRSetAnswer (Right [rr]))
+                 ))
+               empty
+               -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
 
-    empty
+        _ -> (report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
 
-  -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
 
-  return ()
+
+
+
+
 
 dropdot :: String -> String
 dropdot s | last s == '.' = init s
@@ -406,4 +452,8 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 -- TODO: examine SOA fields: validate SMTP is listening on the listening port? validate that the SOA master field is a nameserver in the NS records. Potentially use that SOA master as another nameserver if it is not so described, which could generate a low-priority warning. (esp if it reveals inconsistencies) - that bit is more linty rather than actual errors.
 
 -- TODO: examine authoritative servers and see if they advertise recursion available. linty-warning if they do.
+
+-- TODO: know when we requested recursion or not, and how that interacts with authoritative data or not, and store that in provenance somehow.
+
+-- TODO: detect mutual no-glue loops (and give warning?) - where two zones use each other at least in part to serve each other, so there is no glue but they are at least partially mutually dependent for each others resolvability.
 
