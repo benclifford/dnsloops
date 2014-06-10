@@ -26,7 +26,7 @@ class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
   -- about the answer type: running the query might push
   -- many different answers to many different queries in
   -- addition to this query.
-  runQable :: q -> Q final ()
+  runQable :: Typeable final => q -> Q final ()
 
 -- | QInstruction are the simple instructions to be used
 -- inside the operational monad.
@@ -37,13 +37,19 @@ data QInstruction final x where
   -- runs an action in the underlying IO monad
   QT :: IO r -> QInstruction final r
   -- | Asks for a query to be made without waiting for any answers
-  QLaunch :: Qable q a => q -> QInstruction final ()
+  QLaunch :: (Typeable final, Qable q a) => q -> QInstruction final ()
   -- | Records an answer to a query (which might not have been launched...)
-  QRecord :: Qable q a => q -> a -> QInstruction final ()
+  QRecord :: (Typeable final, Qable q a) => q -> a -> QInstruction final ()
   -- | QPull asks for the responses to a query without launching that
   --   query. Often it should follow a push, I think, but sometimes not -
   --   for example when looking for cached values.
   -- but what should the type of this look like?
+  -- TODO: I do not entirely remember why I need to 
+  -- force typeable to be final here. It is used in PreviousPull
+  -- somehow. Investigate if it is necessary (because it pushes
+  -- that typeable constraint further out into client programs
+  -- sometimes in a way that seems superficially unnecessary)
+
   QPull :: (Typeable final, Qable q a) => q -> QInstruction final a
   QPushFinalResult :: final -> QInstruction final ()
 
@@ -212,12 +218,13 @@ dumpPreviousResults = do
 unsafeQT :: IO x -> Q final x
 unsafeQT a = singleton $ QT a
 
-qlaunch q = singleton $ QLaunch q
+qlaunch :: (Typeable final, Qable q a) => q -> Q final a
+qlaunch q = (singleton $ QLaunch q) *> empty
 
 qrecord q a = singleton $ QRecord q a
 
 qpull q = singleton $ QPull q
 
-query q = qlaunch q *> qpull q
+query q = qlaunch q <|> qpull q
 
 pushFinalResult v = singleton $ QPushFinalResult v
