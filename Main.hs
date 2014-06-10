@@ -32,7 +32,7 @@ instance Qable ResolverQuery ResolverAnswer where
     result <- unsafeQT $ do
       resolver <- makeResolvSeed rc
       withResolver resolver $ \r -> lookupRaw r d t
-    return ()
+    return () -- TODO: whats this return () for? I think its dead code.
     qrecord q (ResolverAnswer result)
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
@@ -46,6 +46,9 @@ data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable
 data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
 -- TODO: there should be another answer option that is NoNameserver
 
+-- TODO: this implementation uses the local default resolver
+-- rather than recursively starting something new
+-- which is what should happen (probably via GetRRSetQuery)
 instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
     result <- unsafeQT $ do
@@ -116,6 +119,10 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
 
+-- | complexResolve must not add final results because
+-- it is used recursively.
+-- but it should record RRsets for GetRRSetQuery results
+-- I think.
 complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
 complexResolve qname qrrtype = do
 
@@ -380,4 +387,15 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 --    an error, so then I should make that potentially stop resolving, as
 --    well as continuing)
 
+-- TODO: stack depth/work performed timeout counter to stop
+-- infinte loops, or some proof that infinite loops will not
+-- happen even in the presence of weird browser queries
+-- (which I think is not true, because I can always say
+-- zone n is served by servers in zone n+1 and then cause
+-- a further query for n+1 name servers.
+
+-- TODO: make sure no use of recursive/system resolver except
+-- when doing explicit lookaside.
+
+-- TODO: examine SOA fields: validate SMTP is listening on the listening port? validate that the SOA master field is a nameserver in the NS records. Potentially use that SOA master as another nameserver if it is not so described, which could generate a low-priority warning. (esp if it reveals inconsistencies) - that bit is more linty rather than actual errors.
 
