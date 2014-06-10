@@ -3,9 +3,17 @@
 
 module Test where
 
+import Data.IORef
 import Data.List
 import Data.Typeable
 import Control.Monad
+
+import System.IO.Unsafe
+  -- this is used to check repeated query
+  -- execution. If Q became a transfomer
+  -- then it could be over a state monad
+  -- and unsafe IO would not be needed to
+  -- give this external counter.
 
 import Q
 
@@ -82,6 +90,10 @@ main = do
   r <- runQ $ ((query ArbB >> mzero) `mplus` query ArbA `mplus` (query ArbC >> mzero))
   when (sort r /= sort [ArbRes "Hello", ArbRes "Hi"]) (error $ "test failed. got " ++ (show r))
 
+  putStrLn "Same query launched twice should not launch runQable twice"
+  r <- runQ $ qlaunch ArbCounterUnsafeIO `mplus` qlaunch ArbCounterUnsafeIO `mplus` qpull ArbCounterUnsafeIO
+  putStrLn $ "r = " ++ (show r) ++ " -- probably expecting a single result"
+  when (length r /= 1) (error "Test failed: r should have exactly one element")
 
 instance Qable StrLenQuery Int where
   runQable q@(StrLenQuery s) = qrecord q (length s)
@@ -96,11 +108,17 @@ instance Qable IntegerQuery Int where
 data IntegerQuery = Inc Int | Dec Int deriving (Show, Eq, Typeable)
 
 
-data ArbQuery = ArbA | ArbB | ArbC deriving (Show, Eq, Typeable)
+data ArbQuery = ArbA | ArbB | ArbC | ArbCounterUnsafeIO deriving (Show, Eq, Typeable)
 data ArbRes = ArbRes String deriving (Show, Eq, Typeable, Ord)
 
 instance Qable ArbQuery ArbRes where
   runQable ArbA = qrecord ArbA (ArbRes "Hi")
   runQable ArbB = qrecord ArbB (ArbRes "Bye") >> qrecord ArbA (ArbRes "Hello") >> qrecord ArbC (ArbRes "test")
   runQable ArbC = return ()
+  runQable q@ArbCounterUnsafeIO = do
+    unsafeQT $ modifyIORef arbCounterRef (+1)
+    v <- unsafeQT $ readIORef arbCounterRef
+    qrecord q (ArbRes $ show v)
+
+arbCounterRef = unsafePerformIO $ newIORef (0 :: Integer)
 
