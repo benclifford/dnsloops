@@ -35,7 +35,7 @@ instance Qable ResolverQuery ResolverAnswer where
     -- we record the answer but we also shred it up and cache
     -- other things it might be an answer to.
     (qrecord q (ResolverAnswer result))
-      <|> cacheResolverAnswer d t result -- TODO: this probably needs more info about the query in order to perform validation.
+      <|> cacheResolverAnswer rc d t result -- TODO: this probably needs more info about the query in order to perform validation.
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
@@ -187,7 +187,7 @@ complexResolve qname qrrtype = do
                    , ans <- answer df
                    , ans /= []
           -> do
-               report $ "complexResolve: processing answer records (NOTIMPL) " ++ (show $ ans)
+               report $ "complexResolve: Answer records will be cached by other handler: " ++ (show $ ans)
                empty
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
 
@@ -202,7 +202,7 @@ complexResolve qname qrrtype = do
 
 
 
-cacheResolverAnswer qname qrrtype r = do
+cacheResolverAnswer server qname qrrtype r = do
       -- so this might be our answer! (one day)
       -- or more likely its a delegation - what does that look like according
       -- to the spec? My informal understanding is we get 
@@ -278,6 +278,9 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
         (Right df) | (rcode . flags . header) df == NoErr
                    , ans <- answer df
                    , ans /= []
+                   , [qrrname] <- (nub (rrname <$> ans))
+                      -- check we only got answer records for the
+                      -- rname we requested
           -> do
                report $ "Processing answer records: " ++ (show $ ans)
                -- TODO: group the answers into RRSets of common name and type, rather than pushing RRSet answers as individual rows.
@@ -288,14 +291,12 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                  ))
                empty
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
-
-        _ -> (report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
-
-
-
-
-
-
+               -- TODO: cache any additional data that we got here
+        _ -> do
+               report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
+               qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: when querying nameserver " ++ (show $ resolvInfo server)))
+               empty -- TODO something more interesting here
+               -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
 
 dropdot :: String -> String
 dropdot s | last s == '.' = init s
