@@ -457,3 +457,7 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 
 -- TODO: detect mutual no-glue loops (and give warning?) - where two zones use each other at least in part to serve each other, so there is no glue but they are at least partially mutually dependent for each others resolvability.
 
+-- TODO: for every PTR and A record encountered, validate that they have correct forward/backward lookup - this can be a warning if not matching, but some times (eg on MX?) spam software will not like it if theres a mismatch, so warn in that case harder.
+
+-- TODO: warn on CNAMEs where a CNAME shouldn't be (NS and MX? rfc cites?)
+
