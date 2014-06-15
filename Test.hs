@@ -95,6 +95,8 @@ main = do
   putStrLn $ "r = " ++ (show r) ++ " -- probably expecting a single result"
   when (length r /= 1) (error "Test failed: r should have exactly one element")
 
+  putStrLn "Tests finished without failure"
+
 instance Qable StrLenQuery Int where
   runQable q@(StrLenQuery s) = qrecord q (length s)
 
