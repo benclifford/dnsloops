@@ -279,8 +279,9 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                    , ans <- answer df
                    , ans /= []
                    , [qrrname] <- (nub (rrname <$> ans))
+                   , [qrrtype] <- (nub (rrtype <$> ans))
                       -- check we only got answer records for the
-                      -- rname we requested
+                      -- rname and type that we requested
           -> do
                report $ "Processing answer records: " ++ (show $ ans)
                -- TODO: group the answers into RRSets of common name and type, rather than pushing RRSet answers as individual rows.
