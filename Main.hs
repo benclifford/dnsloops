@@ -233,7 +233,9 @@ cacheResolverAnswer server qname qrrtype r = do
       -- move in there.
 
       -- TODO: this case needs splitting into functions for
-      -- readability
+      -- readability. Perhaps can use applicative parser style
+      -- to match various cases in sequence, as named cases,
+      -- rather than using a case construct.
       case r of 
         (Right df) | (rcode . flags . header) df == NoErr
                    , answer df == []
