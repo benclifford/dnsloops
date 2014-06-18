@@ -523,3 +523,7 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 
 -- TODO: warn on CNAMEs where a CNAME shouldn't be (NS and MX? rfc cites?)
 
+-- TODO: this internet-draft: 
+-- http://tools.ietf.org/html/draft-koch-dns-glue-clarifications-03
+-- might have some interesting stuff about glue.
+-- also RFC4472
