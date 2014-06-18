@@ -295,6 +295,52 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                empty
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
                -- TODO: cache any additional data that we got here
+
+        -- The CNAME case:
+        -- If we didn't request a cname, but the answer
+        -- contains a CNAME, and potentially other
+        -- answers, including potentially more CNAMEs.
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , qrrtype /= CNAME
+                   , ans <- answer df
+                   , ans /= []
+                   , CNAME `elem` (rrtype <$> ans)
+                   -- there should be one unique record that
+                   -- is a CNAME for the 
+{-
+                   , [cqname] <- rrname <$>
+                                     (filter (\rr -> rrname rr == qname
+                                                  && rrtype rr == CNAME)
+                                             ans)
+-}
+                      -- check we only got answer records for the
+                      -- rname and type that we requested
+          -> 
+               -- TODO:
+               -- we need to record the answers,authority,additional
+               -- but we need to also launch a new lookup of the
+               -- CNAME and transpose any results from that into
+               -- results for this lookup.
+               ( do
+                    let cql = rdata <$>
+                                     (filter (\rr -> rrname rr =.= qname
+                                                  && rrtype rr == CNAME)
+                                             ans)
+                    -- unsafeQT $ error $ "cql = " ++ (show cql) ++ ", ans = " ++ (show ans) ++ ", qname = " ++ (show qname)
+                    let [RD_CNAME cqname] = cql
+                    -- unsafeQT $ error $ "cqname to resolve: " ++ (show cqname)
+                    cnamedRRSet <- query (GetRRSetQuery (pack $ dropDot $ unpack cqname) qrrtype)
+                    -- this will either be a Left or a Right
+                    -- if its a Right, transpose that RRSet
+                    -- if its a Left, make a stack-trace like nested Left
+                    case cnamedRRSet of
+                      GetRRSetAnswer (Left err) ->
+                        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer $ Left $ "When resolving CNAME: " ++ err) *> empty
+                      r@(GetRRSetAnswer (Right rrset)) ->
+                        qrecord (GetRRSetQuery qname qrrtype) r *> empty
+                )
+--XXX        
+
         _ -> do
                report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
                qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: when querying nameserver " ++ (show $ resolvInfo server)))
@@ -371,6 +417,18 @@ isCached _ = return False
 
 report :: String -> Q any ()
 report s = unsafeQT $ putStrLn s
+
+-- | compares domains, ignoring the
+-- final dot or not.
+-- TODO: this shouldn't exist, and
+-- instead a proper normalised form
+-- for domains should be used right
+-- from the start.
+(=.=) :: Domain -> Domain -> Bool
+l =.= r = (dropDot $ unpack l) == (dropDot $ unpack r)
+
+dropDot s | s /= [], last s == '.' = init s
+dropDot s = s
 
 {-
 getAncestorNameServer :: LDomain -> Q any LDomain
