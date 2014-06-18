@@ -16,3 +16,8 @@ Executable dnsloops
   main-is: Main.hs
   ghc-options: -main-is Main
 
+Test-suite test-dnsloops
+  Type: exitcode-stdio-1.0
+  main-is: test-dnsloops.hs
+  build-depends: base
+
