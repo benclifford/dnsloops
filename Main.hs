@@ -85,9 +85,10 @@ main = do
 
 --  runQ $ resolve ["www", "hawaga", "org", "uk"]
 
-  [h] <- getArgs
+  [h, tys] <- getArgs
 
   let hostname = pack h
+  let ty = read tys
 
   putStrLn "============ Test 1 ============"
   res <- runQ (simpleQuery hostname)
@@ -95,7 +96,7 @@ main = do
   print res
 
   putStrLn "============ Test 2 ============"
-  res <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname A)
+  res <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
 
   putStrLn "Final result in Main: "
   print res
