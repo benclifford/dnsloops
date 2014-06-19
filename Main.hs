@@ -158,6 +158,11 @@ complexResolve qname qrrtype = do
     (GetNameserverAnswer ns) <- qpull (GetNameserverQuery domainSuffixByteString)
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
 
+    -- TODO BUG: this pattern match will fail if the query
+    -- returns a failure. That query should perhaps cascade,
+    -- or generate a warning, or what? Probably need to think
+    -- about what happens in the normal algorithm when this
+    -- fails.
     (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
 
     forA_ alist $ \arec -> do
