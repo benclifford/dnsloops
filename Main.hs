@@ -533,3 +533,6 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 -- http://tools.ietf.org/html/draft-koch-dns-glue-clarifications-03
 -- might have some interesting stuff about glue.
 -- also RFC4472
+
+-- TODO: detect private IPv4 and link/site scoped IPv6 addresses in A/AAAA records
+
