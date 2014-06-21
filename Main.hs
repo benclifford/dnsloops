@@ -15,6 +15,7 @@ import Data.Typeable
 import Network.DNS
 
 import System.Environment (getArgs)
+import System.IO.Error
 
 import Q
 import Control.Monad
@@ -25,17 +26,32 @@ type LDomain = [LLabel]
 type LLabel = String
 
 data ResolverQuery = ResolverQuery ResolvConf Domain TYPE deriving (Show, Eq, Typeable)
-data ResolverAnswer = ResolverAnswer (Either DNSError DNSFormat) deriving (Show, Eq, Typeable)
+data ResolverAnswer =
+    ResolverAnswer (Either ResolverError DNSFormat)
+  deriving (Show, Eq, Typeable)
+
+data ResolverError =
+    ResolverDNSError DNSError
+  | ResolverIOError IOError
+  deriving (Show, Eq, Typeable)
 
 instance Qable ResolverQuery ResolverAnswer where
   runQable q@(ResolverQuery rc d t) = do
     result <- unsafeQT $ do
       resolver <- makeResolvSeed rc
-      withResolver resolver $ \r -> lookupRaw r d t
+      tryIOError $ withResolver resolver $ \r -> lookupRaw r d t
     -- we record the answer but we also shred it up and cache
     -- other things it might be an answer to.
-    (qrecord q (ResolverAnswer result))
-      <|> cacheResolverAnswer rc d t result -- TODO: this probably needs more info about the query in order to perform validation.
+    case result of
+      Right res ->
+        (qrecord q (ResolverAnswer (liftDNSError res)))
+        <|> cacheResolverAnswer rc d t res -- TODO: this probably needs more info about the query in order to perform validation.
+      Left ioErr -> qrecord q (ResolverAnswer (Left $ ResolverIOError ioErr))
+        -- TODO: need to cache IOErrors somehow. In the same way as I'm recording DNSError I guess...
+
+liftDNSError :: Either DNSError a -> Either ResolverError a
+liftDNSError (Left e) = Left (ResolverDNSError e)
+liftDNSError (Right v) = Right v
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
@@ -536,3 +552,4 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 
 -- TODO: detect private IPv4 and link/site scoped IPv6 addresses in A/AAAA records
 
+-- TODO: generate warning when some-but-not-all servers in an NS RRset error.
