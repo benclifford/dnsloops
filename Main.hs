@@ -9,7 +9,8 @@ import Control.Applicative
 import Data.ByteString.Char8 (pack, split, intercalate, unpack)
 import Data.Foldable (asum, Foldable)
 import Data.IP
-import Data.List (tails, nub)
+import Data.List (tails, nub, groupBy, sortBy)
+import Data.Ord (comparing)
 import Data.Typeable
 
 import Network.DNS
@@ -88,7 +89,7 @@ deriving instance Show ResolvConf
 deriving instance Eq ResolvConf
 deriving instance Show FileOrNumericHost
 deriving instance Eq FileOrNumericHost
-
+deriving instance Ord TYPE
 
 main = do
   putStrLn "DNSLoops main"
@@ -184,9 +185,9 @@ complexResolve qname qrrtype = do
     case nserverAddressRRSet of 
       (GetRRSetAnswer (Left e)) ->
         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
-      (GetRRSetAnswer (Right alist)) -> do
+      (GetRRSetAnswer (Right aRRset)) -> do
 
-        forA_ alist $ \arec -> do
+        forA_ aRRset $ \arec -> do
           report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
           -- TODO: check arec has rrtype A and fail a bit if not (by which I mean taint something appropriately and continue)
           let rd = show $ rdata arec
@@ -283,11 +284,11 @@ cacheResolverAnswer server qname qrrtype r = do
                  -- rrname/rrtype more than once in additional data?
                  -- At least put a check in for it and give a WARNING about
                  -- unhandled behaviour
-                 forA_ (additional df) (\ad -> 
-                      (report $ "cacheResolverAnswer: DELEGATION ADDITIONAL DATA: " ++ (show ad))
+                 forA_ (rrlistToRRsets $ additional df) (\adRRset -> 
+                      (report $ "cacheResolverAnswer: DELEGATION ADDITIONAL DATA: " ++ (show adRRset))
   
-                   *> (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname ad) (rrtype ad))
-                               (GetRRSetAnswer (Right [ad])) -- TODO: see above TODO: if I've grouped by rrname/rrtype, this list may have more than one entry
+                   *> (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname $ head adRRset) (rrtype $ head adRRset))
+                               (GetRRSetAnswer (Right adRRset))
                       )
 {-
 
@@ -314,11 +315,19 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
           -> do
                report $ "Processing answer records: " ++ (show $ ans)
                -- TODO: group the answers into RRSets of common name and type, rather than pushing RRSet answers as individual rows.
-               forA_ ans (\rr ->
-                 (report $ "cacheResolverAnswer: ANSWER (improperly formed rrset due to my bad code)" ++ show rr)
+               -- so group ans into rrsets, and iterate over that
+               -- using an RR-list to RRsets conversion function
+               -- that can be reused
+               let ansRRsets = rrlistToRRsets ans
+               forA_ ansRRsets (\rrset ->
+                 (report $ "cacheResolverAnswer: ANSWER RRset: " ++ show rrset)
                 <|>
-                 (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname rr) (rrtype rr)) (GetRRSetAnswer (Right [rr]))
+                 (
+                  let
+                    exampleRR = head rrset
+                    in (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset))
                  ))
+                 )
                empty
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
                -- TODO: cache any additional data that we got here
@@ -456,6 +465,18 @@ l =.= r = (dropDot $ unpack l) == (dropDot $ unpack r)
 
 dropDot s | s /= [], last s == '.' = init s
 dropDot s = s
+
+-- | groups resource records into RRsets
+-- where the records in each RRset have
+-- the same (qname,qtype)
+rrlistToRRsets :: [ResourceRecord] -> [[ResourceRecord]]
+rrlistToRRsets rrs = let
+  l `eqRRset` r = (rrname l == rrname r)
+               && (rrtype l == rrtype r)
+  key rr = (rrname rr, rrtype rr)
+  compareRRset = comparing key
+  in groupBy eqRRset $ sortBy compareRRset rrs
+
 
 {-
 getAncestorNameServer :: LDomain -> Q any LDomain
