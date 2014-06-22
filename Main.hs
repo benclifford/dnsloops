@@ -553,3 +553,5 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 -- TODO: detect private IPv4 and link/site scoped IPv6 addresses in A/AAAA records
 
 -- TODO: generate warning when some-but-not-all servers in an NS RRset error.
+
+-- TODO: examine eg pool.ntp.org as an example of how I should get some warnings when i) different servers are returning different result sets; and ii) the same server queried repeatedly gives out different results.
