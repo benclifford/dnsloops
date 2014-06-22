@@ -77,12 +77,14 @@ data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeab
 -- which is what should happen (probably via GetRRSetQuery)
 instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
-    result <- unsafeQT $ do
-      resolver <- makeResolvSeed defaultResolvConf
-      withResolver resolver $ \r -> lookupNS r d
-    case result of
-      Right nameservers -> forM_ nameservers $ \ns -> qrecord q (GetNameserverAnswer ns)
-      Left _ -> return () -- TODO: what should I do in the case of error? depends on the error. For now, silent discard
+    GetRRSetAnswer a <- query $ GetRRSetQuery d NS
+    case a of
+      Left e -> unsafeQT $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
+      -- TODO ^ what to record for the error case?
+      Right rrs -> forA_ rrs $ \rr -> let
+        (RD_NS nsrv) = rdata rr
+        in qrecord q (GetNameserverAnswer nsrv)
+
 
 main = do
   putStrLn "DNSLoops main"
