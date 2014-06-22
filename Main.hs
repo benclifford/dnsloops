@@ -1,6 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternGuards #-}
 
 module Main where
@@ -18,6 +17,7 @@ import Network.DNS
 import System.Environment (getArgs)
 import System.IO.Error
 
+import Instances
 import Q
 import Control.Monad
 
@@ -83,13 +83,6 @@ instance Qable GetNameserverQuery GetNameserverAnswer where
     case result of
       Right nameservers -> forM_ nameservers $ \ns -> qrecord q (GetNameserverAnswer ns)
       Left _ -> return () -- TODO: what should I do in the case of error? depends on the error. For now, silent discard
-
--- | these instances are needed to support Show and Eq on ResolverQuery and ResolverAnswer
-deriving instance Show ResolvConf
-deriving instance Eq ResolvConf
-deriving instance Show FileOrNumericHost
-deriving instance Eq FileOrNumericHost
-deriving instance Ord TYPE
 
 main = do
   putStrLn "DNSLoops main"
