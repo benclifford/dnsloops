@@ -179,43 +179,48 @@ complexResolve qname qrrtype = do
     -- or generate a warning, or what? Probably need to think
     -- about what happens in the normal algorithm when this
     -- fails.
-    (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
+    -- (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
+    nserverAddressRRSet <- query (GetRRSetQuery ns A)
+    case nserverAddressRRSet of 
+      (GetRRSetAnswer (Left e)) ->
+        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
+      (GetRRSetAnswer (Right alist)) -> do
 
-    forA_ alist $ \arec -> do
-      report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
-      -- TODO: check arec has rrtype A and fail a bit if not (by which I mean taint something appropriately and continue)
-      let rd = show $ rdata arec
-      report $ "Nameserver string is: " ++ (rd)
-      -- TODO: now, query that nameserver for the whole domain
-      -- and looping needs to happen by the results matching
-      -- a different (deeper) branch of the above query.
-      -- do this in a Qable so as to support things later like
-      -- retrying of queries to check consistency, and
-      -- launching queries from different network locations
-      -- TODO: parameterise the A
-      (ResolverAnswer r) <- query $ ResolverQuery
-        (defaultResolvConf { resolvInfo = RCHostName rd })
-        qname qrrtype
-      report $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
+        forA_ alist $ \arec -> do
+          report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
+          -- TODO: check arec has rrtype A and fail a bit if not (by which I mean taint something appropriately and continue)
+          let rd = show $ rdata arec
+          report $ "Nameserver string is: " ++ (rd)
+          -- TODO: now, query that nameserver for the whole domain
+          -- and looping needs to happen by the results matching
+          -- a different (deeper) branch of the above query.
+          -- do this in a Qable so as to support things later like
+          -- retrying of queries to check consistency, and
+          -- launching queries from different network locations
+          -- TODO: parameterise the A
+          (ResolverAnswer r) <- query $ ResolverQuery
+            (defaultResolvConf { resolvInfo = RCHostName rd })
+            qname qrrtype
+          report $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
 
-      case r of 
-        (Right df) | (rcode . flags . header) df == NoErr
-                   , answer df == []
-                   , nub (rrtype <$> (authority df)) == [NS]
-                   , [delegzone] <- (nub (rrname <$> (authority df)))
-          ->  report $ "complexResolve: can ignore delegation"
-        (Right df) | (rcode . flags . header) df == NoErr
-                   , ans <- answer df
-                   , ans /= []
-          -> do
-               report $ "complexResolve: Answer records will be cached by other handler: " ++ (show $ ans)
-               empty
-               -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
+          case r of 
+            (Right df) | (rcode . flags . header) df == NoErr
+                       , answer df == []
+                       , nub (rrtype <$> (authority df)) == [NS]
+                       , [delegzone] <- (nub (rrname <$> (authority df)))
+              ->  report $ "complexResolve: can ignore delegation"
+            (Right df) | (rcode . flags . header) df == NoErr
+                       , ans <- answer df
+                       , ans /= []
+              -> do
+                   report $ "complexResolve: Answer records will be cached by other handler: " ++ (show $ ans)
+                   empty
+                   -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
 
-        _ -> (report $ "complexResolve: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
+            _ -> (report $ "complexResolve: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
 
-    empty
+        empty
 
   -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
 
