@@ -95,12 +95,12 @@ main = do
   let ty = read tys
 
   putStrLn "============ Test 1 ============"
-  res <- runQ (simpleQuery hostname)
+  res <- evalQ (simpleQuery hostname)
   putStrLn "Final result in Main: "
   print res
 
   putStrLn "============ Test 2 ============"
-  res <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
+  res <- evalQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
 
   putStrLn "Final result in Main: "
   print res

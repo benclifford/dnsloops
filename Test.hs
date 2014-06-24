@@ -21,44 +21,44 @@ main = do
   putStrLn "dnsloops test"
 
   putStrLn "test return ()"
-  runQ $ return ()
+  evalQ $ return ()
 
   putStrLn "test launch a query"
-  runQ $ qlaunch $ StrLenQuery "Hello"
+  evalQ $ qlaunch $ StrLenQuery "Hello"
 
 
   putStrLn "test launch and pull a query"
-  [r] <- runQ $ query $ StrLenQuery "Hello"
+  [r] <- evalQ $ query $ StrLenQuery "Hello"
   putStr "test result: "
   print r
   when (r /= 5) (error "test failed")
 
   putStrLn "test launch and pull another query"
-  [r] <- runQ $ query $ StrLenQuery "Hello World"
+  [r] <- evalQ $ query $ StrLenQuery "Hello World"
   putStr "test result: "
   print r
   when (r /= 11) (error "test failed")
 
   putStrLn "test Inc 10"
-  [r] <- runQ $ query $ Inc 10
+  [r] <- evalQ $ query $ Inc 10
   putStr "test result: "
   print r
   when (r /= 11) (error "test failed")
 
   putStrLn "test Dec 33"
-  [r] <- runQ $ query $ Dec 33
+  [r] <- evalQ $ query $ Dec 33
   putStr "test result: "
   print r
   when (r /= 32) (error "test failed")
 
   putStrLn "Test a sequence of queries"
-  runQ $ do
+  evalQ $ do
     query $ Dec 33
     query $ Inc 15
     query $ StrLenQuery "Hi"
 
   putStrLn "Test same query twice"
-  rv <- runQ $ do
+  rv <- evalQ $ do
     r1 <- query $ Inc 15
     r2 <- query $ Inc 15
     return (r1, r2)
@@ -67,31 +67,31 @@ main = do
   when ( rv /= [(16,16)]) $ error "test failed"  
 
   putStrLn "A launch and a pull in mplus-style parallel"
-  r <- runQ $ (qlaunch (Inc 15) >> mzero) `mplus` (qpull (Inc 15))
+  r <- evalQ $ (qlaunch (Inc 15) >> mzero) `mplus` (qpull (Inc 15))
   putStrLn "Test result: "
   print r
   when ( r /= [16] ) $ error "test failed"
 
   putStrLn "A pull and a launch in mplus-style parallel"
-  r <- runQ $ (qpull (Inc 15)) `mplus` (qlaunch (Inc 15) >> mzero)
+  r <- evalQ $ (qpull (Inc 15)) `mplus` (qlaunch (Inc 15) >> mzero)
   putStrLn "Test result: "
   print r
   when ( r /= [16] ) $ error "test failed"
 
   putStrLn "Query ArbA"
-  r <- runQ $ (query ArbA)
+  r <- evalQ $ (query ArbA)
   when (r /= [ArbRes "Hi"]) (error "test failed")
 
   putStrLn "Query ArbB mplus query ArbA"
-  r <- runQ $ ((query ArbB >> mzero) `mplus` query ArbA)
+  r <- evalQ $ ((query ArbB >> mzero) `mplus` query ArbA)
   when (sort r /= sort [ArbRes "Hello", ArbRes "Hi"]) (error $ "test failed. got " ++ (show r))
 
   putStrLn "Query ArbB mplus query ArbA mplus ArbC"
-  r <- runQ $ ((query ArbB >> mzero) `mplus` query ArbA `mplus` (query ArbC >> mzero))
+  r <- evalQ $ ((query ArbB >> mzero) `mplus` query ArbA `mplus` (query ArbC >> mzero))
   when (sort r /= sort [ArbRes "Hello", ArbRes "Hi"]) (error $ "test failed. got " ++ (show r))
 
   putStrLn "Same query launched twice should not launch runQable twice"
-  r <- runQ $ qlaunch ArbCounterUnsafeIO `mplus` qlaunch ArbCounterUnsafeIO `mplus` qpull ArbCounterUnsafeIO
+  r <- evalQ $ qlaunch ArbCounterUnsafeIO `mplus` qlaunch ArbCounterUnsafeIO `mplus` qpull ArbCounterUnsafeIO
   putStrLn $ "r = " ++ (show r) ++ " -- probably expecting a single result"
   when (length r /= 1) (error "Test failed: r should have exactly one element")
 

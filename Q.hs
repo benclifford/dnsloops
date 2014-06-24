@@ -99,8 +99,8 @@ emptyDB = DB {
 
 -- * The interpreter
 
-runQ :: Q final final -> IO [final]
-runQ m = do
+evalQ :: Q final final -> IO [final]
+evalQ m = do
   let p = do
              r <- m
              pushFinalResult r
