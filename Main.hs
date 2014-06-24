@@ -102,9 +102,35 @@ main = do
   putStrLn $ "Number of previous pulls: " ++ (show $ length $ previousPulls db)
   putStrLn $ "Number of final results: " ++ (show $ length $ finalResults db)
 
+  let launchTypes = typeOfPreviousLaunch <$> ((previousLaunches db))
+        where typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
+
+  putStrLn $ "Launch types: " ++ (show $ nub launchTypes)
+  forM_ (nub launchTypes) $ \lt -> do
+    putStr "  "
+    putStr (show lt)
+    putStr ": "
+    putStr $ show $ length $ filter (== lt) $ launchTypes
+    putStrLn ""
+
+  -- we could get the type of a here, but there is slightly
+  -- more information contained in q because multiple
+  -- q types can share the same a type.
+  let resultTypes = typeOfPreviousResult <$> ((previousResults db))
+        where typeOfPreviousResult (PreviousResult q a) = typeOf q
+
+  putStrLn $ "Result types: " ++ (show $ nub resultTypes)
+  forM_ (nub resultTypes) $ \lt -> do
+    putStr "  "
+    putStr (show lt)
+    putStr ": "
+    putStr $ show $ length $ filter (== lt) $ resultTypes
+    putStrLn ""
+
   putStrLn "Final result in Main: "
   print res
 
+typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
 populateRootHints = 
       (qrecord (GetNameserverQuery rootName)
