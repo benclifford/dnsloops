@@ -94,7 +94,13 @@ main = do
   let hostname = pack h
   let ty = read tys
 
-  res <- evalQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
+  (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
+
+  putStrLn "Database stats:"
+  putStrLn $ "Number of previous launches: " ++ (show $ length $ previousLaunches db)
+  putStrLn $ "Number of previous results: " ++ (show $ length $ previousResults db)
+  putStrLn $ "Number of previous pulls: " ++ (show $ length $ previousPulls db)
+  putStrLn $ "Number of final results: " ++ (show $ length $ finalResults db)
 
   putStrLn "Final result in Main: "
   print res
