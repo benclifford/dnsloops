@@ -128,7 +128,7 @@ main = do
     putStrLn ""
 
   putStrLn "Final result in Main: "
-  print res
+  print `mapM` res
 
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
