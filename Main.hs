@@ -89,14 +89,6 @@ instance Qable GetNameserverQuery GetNameserverAnswer where
 main = do
   putStrLn "DNSLoops main"
 
-{-
-  resolver <- makeResolvSeed defaultResolvConf
-  result <- withResolver resolver $ \r -> lookupRaw r hostname A
-  print result 
--}
-
---  runQ $ resolve ["www", "hawaga", "org", "uk"]
-
   [h, tys] <- getArgs
 
   let hostname = pack h
