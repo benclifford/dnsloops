@@ -94,19 +94,11 @@ main = do
   let hostname = pack h
   let ty = read tys
 
-  putStrLn "============ Test 1 ============"
-  res <- evalQ (simpleQuery hostname)
-  putStrLn "Final result in Main: "
-  print res
-
-  putStrLn "============ Test 2 ============"
   res <- evalQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
 
   putStrLn "Final result in Main: "
   print res
 
-
-simpleQuery hostname = query (ResolverQuery defaultResolvConf hostname A)
 
 populateRootHints = 
       (qrecord (GetNameserverQuery rootName)
