@@ -592,3 +592,20 @@ getAncestorNameServer domain = return ["a","root-servers","net"]
 -- TODO: generate warning when some-but-not-all servers in an NS RRset error.
 
 -- TODO: examine eg pool.ntp.org as an example of how I should get some warnings when i) different servers are returning different result sets; and ii) the same server queried repeatedly gives out different results.
+
+-- TODO: an actual problem that occurred with A&A: one of the
+-- auth.primary-dns.co.uk was timeing out. the other was answering
+-- so I want to know that the result was aquired but I also want
+-- some kind of warning saying a timeout occurred on the way to
+-- this result. What is the right UI for presenting this info?
+-- remember that it may happen anywhere in the Q run, not just
+-- in the direct parents of the current query.
+
+-- TODO: case of authoritative denial of existence:
+-- no answer, and SOA records in the authority section
+
+-- TODO: optional check of all known "auth" NSes for:
+--   i) recursive resolving
+--  ii) root referrals
+--  and generate warnings of such
+
