@@ -101,11 +101,16 @@ emptyDB = DB {
 
 evalQ :: Q final final -> IO [final]
 evalQ m = do
+  (results, db) <- runQ m
+  return results
+
+runQ  :: Q final final -> IO ([final], DB final)
+runQ m = do
   let p = do
              r <- m
              pushFinalResult r
   db <- execStateT (iRunQ p) emptyDB
-  return $ finalResults db
+  return (finalResults db, db)
 
 iRunQ :: Q final x -> StateT (DB final) IO [x]
 iRunQ m = iRunViewedQ (view m)
