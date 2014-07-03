@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Q where
 
@@ -31,7 +32,10 @@ class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
 -- | QInstruction are the simple instructions to be used
 -- inside the operational monad.
 
-type Q final x = ProgramP (QInstruction final) x
+type QProgram final x = ProgramP (QInstruction final) x
+newtype Q final x = Q (QProgram final x)
+  deriving (Applicative, Alternative, Functor, Monad,
+            MonadPlus)
 
 data QInstruction final x where
   -- runs an action in the underlying IO monad
@@ -106,13 +110,13 @@ evalQ m = do
 
 runQ  :: Q final final -> IO ([final], DB final)
 runQ m = do
-  let p = do
+  let (Q p) = do
              r <- m
              pushFinalResult r
   db <- execStateT (iRunQ p) emptyDB
   return (finalResults db, db)
 
-iRunQ :: Q final x -> StateT (DB final) IO [x]
+iRunQ :: QProgram final x -> StateT (DB final) IO [x]
 iRunQ m = iRunViewedQ (view m)
 
 iRunViewedQ :: ProgramViewP (QInstruction final) x -> StateT (DB final) IO [x]
@@ -141,7 +145,8 @@ iRunViewedQ i = case i of
     if not (newLaunchPL `elem` prevs) then do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
       modify $ \olddb -> olddb { previousLaunches = (previousLaunches olddb) ++ [newLaunchPL] }
-      iRunQ (runQable q)
+      let (Q p) = runQable q
+      iRunQ p
       return ()
      else do
       liftIO $ putStrLn $ "Duplicate query submission. Not launching again."
@@ -170,7 +175,7 @@ iRunViewedQ i = case i of
     -- TODO: make a test case to exercise this subtlety
 
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
-    let callback = PreviousPull q (PPQ (\a -> k a >> return ()))
+    let callback = PreviousPull q (PPQ (\a -> Q $ k a >> return ()))
 
     modify $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
 
@@ -205,10 +210,11 @@ processNewResult q v = do
   cbs <- previousPullsForQuery q
 
   liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
-  mapM_ (\(PPQ f) -> iRunQ (f v)) cbs 
+  mapM_ (\(PPQ f) -> iRunQ (unQ $ f v)) cbs 
 
   -- dumpPreviousResults
 
+unQ (Q p) = p
 
 previousResultsForQuery :: (Qable q a) => q -> StateT (DB x) IO [a]
 previousResultsForQuery q  = do
@@ -244,15 +250,15 @@ dumpPreviousResults = do
       liftIO $ print $ previousResults db
 
 unsafeQT :: IO x -> Q final x
-unsafeQT a = singleton $ QT a
+unsafeQT a = Q $ singleton $ QT a
 
 qlaunch :: (Typeable final, Qable q a) => q -> Q final a
-qlaunch q = (singleton $ QLaunch q) *> empty
+qlaunch q = Q $ (singleton $ QLaunch q) *> empty
 
-qrecord q a = singleton $ QRecord q a
+qrecord q a = Q $ singleton $ QRecord q a
 
-qpull q = singleton $ QPull q
+qpull q = Q $ singleton $ QPull q
 
 query q = qlaunch q <|> qpull q
 
-pushFinalResult v = singleton $ QPushFinalResult v
+pushFinalResult v = Q $ singleton $ QPushFinalResult v
