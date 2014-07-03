@@ -271,8 +271,8 @@ cacheResolverAnswer server qname qrrtype r = do
           ->    (report $ "cacheResolverAnswer: This answer is a DELEGATION of zone " ++ (show delegzone))
               <|> (forA_ (rdata <$> (authority df)) (\rd -> 
                          (report $ "cacheResolverAnswer: DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
-                         (qrecord (GetNameserverQuery $ pack $ dropdot $ unpack delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
-                                  (GetNameserverAnswer (pack $ dropdot $ show rd)) *> empty))
+                         (qrecord (GetNameserverQuery $ pack $ dropDot $ unpack delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
+                                  (GetNameserverAnswer (pack $ dropDot $ show rd)) *> empty))
                 )
               <|>
                 (
@@ -286,7 +286,7 @@ cacheResolverAnswer server qname qrrtype r = do
                  forA_ (rrlistToRRsets $ additional df) (\adRRset -> 
                       (report $ "cacheResolverAnswer: DELEGATION ADDITIONAL DATA: " ++ (show adRRset))
   
-                   *> (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname $ head adRRset) (rrtype $ head adRRset))
+                   *> (qrecord (GetRRSetQuery (pack $ dropDot $ unpack $ rrname $ head adRRset) (rrtype $ head adRRset))
                                (GetRRSetAnswer (Right adRRset))
                       )
 {-
@@ -324,7 +324,7 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                  (
                   let
                     exampleRR = head rrset
-                    in (qrecord (GetRRSetQuery (pack $ dropdot $ unpack $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset))
+                    in (qrecord (GetRRSetQuery (pack $ dropDot $ unpack $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset))
                  ))
                  )
                empty
