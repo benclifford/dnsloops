@@ -74,6 +74,7 @@ data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeab
 
 instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
+    unsafeQT $ putStrLn "Launching GetNameserverQUery..."
     GetRRSetAnswer a <- query $ GetRRSetQuery d NS
     case a of
       Left e -> unsafeQT $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
@@ -180,7 +181,7 @@ complexResolve qname qrrtype = do
     -- uniquely numbered query type or some such? Not sure...
 
     report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
-    (GetNameserverAnswer ns) <- qpull (GetNameserverQuery domainSuffixByteString)
+    (GetNameserverAnswer ns) <- query (GetNameserverQuery domainSuffixByteString)
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
 
     -- TODO BUG: this pattern match will fail if the query
