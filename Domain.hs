@@ -3,8 +3,8 @@
 -- | types and functions for domains
 module Domain where
 
-import Data.ByteString.Char8 (unpack)
-import Network.DNS (Domain)
+import Data.ByteString.Char8 (unpack, pack)
+import Network.DNS (Domain, RDATA(RD_NS))
 
 {-
 -- | terminology from RFC1035
@@ -21,11 +21,18 @@ type LLabel = String
 -- for domains should be used right
 -- from the start.
 (=.=) :: Domain -> Domain -> Bool
-l =.= r = (dropDot $ unpack l) == (dropDot $ unpack r)
+l =.= r = (dropDot l) == (dropDot r)
+-- TODO:   (==) `on` dropDot ?
 
-dropDot :: String -> String
-dropDot s | s /= [], last s == '.' = init s
+dropDot :: Domain -> Domain
+dropDot s | s' <- unpack s
+          , s' /= []
+          , last s' == '.' = pack $ init s'
 dropDot s = s
 
+-- | This might fail. Ideally I'd return a Maybe or handle
+-- the failure some other way... TODO
+rdataNSToDomain :: RDATA -> Domain
+rdataNSToDomain (RD_NS domain) = domain
 
 
