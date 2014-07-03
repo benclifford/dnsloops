@@ -74,7 +74,6 @@ data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeab
 
 instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
-    unsafeQT $ putStrLn "Launching GetNameserverQUery..."
     GetRRSetAnswer a <- query $ GetRRSetQuery d NS
     case a of
       Left e -> unsafeQT $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
