@@ -14,10 +14,6 @@ type LLabel = String
 
 -}
 
-dropdot :: String -> String
-dropdot s | last s == '.' = init s
-dropdot s = error $  "Cannot drop the dot off a string that does not end with a dot: " ++ s
-
 -- | compares domains, ignoring the
 -- final dot or not.
 -- TODO: this shouldn't exist, and
