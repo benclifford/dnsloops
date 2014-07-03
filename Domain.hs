@@ -37,8 +37,8 @@ dropDot s = s
 rdataNSToDomain :: RDATA -> Domain
 rdataNSToDomain (RD_NS domain) = domain
 
-parentDomains :: Domain -> [Domain]
-parentDomains qname = let
+ancestorDomains :: Domain -> [Domain]
+ancestorDomains qname = let
   shreddedDomain = split '.' qname
   -- TODO BUG: handling of . inside domain labels (rather than as a separator)
   domainSuffixes = tails shreddedDomain

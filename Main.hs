@@ -153,7 +153,7 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
 complexResolve qname qrrtype = do
 
-  let domainSuffixes = parentDomains qname
+  let domainSuffixes = ancestorDomains qname
 
   forA_ domainSuffixes $ \domainSuffixByteString -> do
 
