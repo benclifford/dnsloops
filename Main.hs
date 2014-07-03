@@ -5,6 +5,7 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad.IO.Class
 import Data.ByteString.Char8 (pack, split, intercalate, unpack)
 import Data.Foldable (asum, Foldable)
 import Data.IP
@@ -38,7 +39,7 @@ data ResolverError =
 
 instance Qable ResolverQuery ResolverAnswer where
   runQable q@(ResolverQuery rc d t) = do
-    result <- unsafeQT $ do
+    result <- liftIO $ do
       resolver <- makeResolvSeed rc
       tryIOError $ withResolver resolver $ \r -> lookupRaw r d t
     -- we record the answer but we also shred it up and cache
@@ -76,7 +77,7 @@ instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
     GetRRSetAnswer a <- query $ GetRRSetQuery d NS
     case a of
-      Left e -> unsafeQT $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
+      Left e -> liftIO $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
       -- TODO ^ what to record for the error case?
       Right rrs -> forA_ rrs $ \rr -> let
         (RD_NS nsrv) = rdata rr
@@ -370,9 +371,9 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                                      (filter (\rr -> rrname rr =.= qname
                                                   && rrtype rr == CNAME)
                                              ans)
-                    -- unsafeQT $ error $ "cql = " ++ (show cql) ++ ", ans = " ++ (show ans) ++ ", qname = " ++ (show qname)
+                    -- liftIO $ error $ "cql = " ++ (show cql) ++ ", ans = " ++ (show ans) ++ ", qname = " ++ (show qname)
                     let [RD_CNAME cqname] = cql
-                    -- unsafeQT $ error $ "cqname to resolve: " ++ (show cqname)
+                    -- liftIO $ error $ "cqname to resolve: " ++ (show cqname)
                     cnamedRRSet <- query (GetRRSetQuery (pack $ dropDot $ unpack cqname) qrrtype)
                     -- this will either be a Left or a Right
                     -- if its a Right, transpose that RRSet
@@ -464,7 +465,7 @@ isCached _ = return False
 -}
 
 report :: String -> Q any ()
-report s = unsafeQT $ putStrLn s
+report s = liftIO $ putStrLn s
 
 -- | compares domains, ignoring the
 -- final dot or not.

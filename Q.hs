@@ -10,6 +10,7 @@ module Q where
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.MonadPlus.Operational
 import Control.Monad.State.Strict
 
@@ -36,6 +37,9 @@ type QProgram final x = ProgramP (QInstruction final) x
 newtype Q final x = Q (QProgram final x)
   deriving (Applicative, Alternative, Functor, Monad,
             MonadPlus)
+
+instance MonadIO (Q final) where
+  liftIO a = Q $ singleton $ QT a
 
 data QInstruction final x where
   -- runs an action in the underlying IO monad
@@ -249,8 +253,6 @@ dumpPreviousResults = do
       db <- get
       liftIO $ print $ previousResults db
 
-unsafeQT :: IO x -> Q final x
-unsafeQT a = Q $ singleton $ QT a
 
 qlaunch :: (Typeable final, Qable q a) => q -> Q final a
 qlaunch q = Q $ (singleton $ QLaunch q) *> empty

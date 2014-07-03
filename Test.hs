@@ -7,6 +7,7 @@ import Data.IORef
 import Data.List
 import Data.Typeable
 import Control.Monad
+import Control.Monad.IO.Class
 
 import System.IO.Unsafe
   -- this is used to check repeated query
@@ -118,8 +119,8 @@ instance Qable ArbQuery ArbRes where
   runQable ArbB = qrecord ArbB (ArbRes "Bye") >> qrecord ArbA (ArbRes "Hello") >> qrecord ArbC (ArbRes "test")
   runQable ArbC = return ()
   runQable q@ArbCounterUnsafeIO = do
-    unsafeQT $ modifyIORef arbCounterRef (+1)
-    v <- unsafeQT $ readIORef arbCounterRef
+    liftIO $ modifyIORef arbCounterRef (+1)
+    v <- liftIO $ readIORef arbCounterRef
     qrecord q (ArbRes $ show v)
 
 arbCounterRef = unsafePerformIO $ newIORef (0 :: Integer)
