@@ -386,7 +386,11 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                       r@(GetRRSetAnswer (Right rrset)) ->
                         qrecord (GetRRSetQuery qname qrrtype) r *> empty
                 )
---XXX        
+        (Right df) | (rcode . flags . header) df == NameErr
+                   , answer df == []
+                   , additional df == []
+                   , nub (rrtype <$> (authority df)) == [SOA]
+          -> qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left "Name does not exist, RCODE 3"))
 
         _ -> do
                report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
