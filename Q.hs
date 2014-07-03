@@ -129,7 +129,7 @@ iRunViewedQ i = case i of
   Return v -> return [v]
 
   (QPushFinalResult v) :>>= k -> do
-    liftIO $ putStrLn "Pushing a final result"
+    liftIO $ putStrLn $ "FINAL"
     modify $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
     iRunQ (k ())
 
@@ -138,8 +138,7 @@ iRunViewedQ i = case i of
     iRunQ (k v)
 
   (QLaunch q) :>>= k -> do
-    liftIO $ putStrLn "LAUNCH"
-    liftIO $ putStrLn $ "Requested query to launch: " ++ (show q)
+    liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
     prevs <- previousLaunches <$> get
     -- liftIO $ putStr "Previously launched queries: "
     -- liftIO $ print prevs
@@ -167,7 +166,7 @@ iRunViewedQ i = case i of
     iRunQ (k ())
 
   (QPull q) :>>= k -> do
-    liftIO $ putStrLn "PULL"
+    liftIO $ putStrLn $ "PULL: " ++ (show q)
     -- dumpPreviousResults
 
 
