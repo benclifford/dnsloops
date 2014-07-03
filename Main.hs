@@ -197,23 +197,6 @@ complexResolve qname qrrtype = do
             qname qrrtype
           debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
-
-          case r of 
-            (Right df) | (rcode . flags . header) df == NoErr
-                       , answer df == []
-                       , nub (rrtype <$> (authority df)) == [NS]
-                       , [delegzone] <- (nub (rrname <$> (authority df)))
-              ->  report $ "complexResolve: can ignore delegation"
-            (Right df) | (rcode . flags . header) df == NoErr
-                       , ans <- answer df
-                       , ans /= []
-              -> do
-                   report $ "complexResolve: Answer records will be cached by other handler: " ++ (show $ ans)
-                   empty
-                   -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
-
-            _ -> (report $ "complexResolve: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)) *> empty -- TODO something more interesting here
-
         empty
 
   -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
@@ -362,11 +345,21 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                       r@(GetRRSetAnswer (Right rrset)) ->
                         qrecord (GetRRSetQuery qname qrrtype) r *> empty
                 )
+
+        -- Two kinds of name not found: one from the name not existing, and
+        -- one for the name existing but not having values of the
+        -- requested rrtype.
+        
         (Right df) | (rcode . flags . header) df == NameErr
                    , answer df == []
                    , additional df == []
                    , nub (rrtype <$> (authority df)) == [SOA]
           -> qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left "Name does not exist, RCODE 3"))
+
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , answer df == []
+                   , nub (rrtype <$> (authority df)) == [SOA]
+          -> qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left "Name has no rrdata of this rrtype"))
 
         _ -> do
                report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
