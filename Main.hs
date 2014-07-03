@@ -7,7 +7,6 @@ module Main where
 import Control.Applicative
 import Control.Monad.IO.Class
 import Data.ByteString.Char8 (pack, split, intercalate, unpack)
-import Data.Foldable (asum, Foldable)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
 import Data.Ord (comparing)
@@ -18,14 +17,11 @@ import Network.DNS
 import System.Environment (getArgs)
 import System.IO.Error
 
+import Domain
 import Instances
 import Q
+import Util
 import Control.Monad
-
--- | terminology from RFC1035
-type LDomain = [LLabel]
-
-type LLabel = String
 
 data ResolverQuery = ResolverQuery ResolvConf Domain TYPE deriving (Show, Eq, Typeable)
 data ResolverAnswer =
@@ -149,12 +145,6 @@ populateRootHints =
 A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
-
--- | for-alternative: rather than performing actions using applicative
--- sequence, perform them using alternative <|>
--- (c.f. for in Traversable (?))
-forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
-forA_ l f = asum (fmap f l)
 
 -- | complexResolve must not add final results because
 -- it is used recursively.
@@ -390,24 +380,8 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                empty -- TODO something more interesting here
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
 
-dropdot :: String -> String
-dropdot s | last s == '.' = init s
-dropdot s = error $  "Cannot drop the dot off a string that does not end with a dot: " ++ s
-
 report :: String -> Q any ()
 report s = liftIO $ putStrLn s
-
--- | compares domains, ignoring the
--- final dot or not.
--- TODO: this shouldn't exist, and
--- instead a proper normalised form
--- for domains should be used right
--- from the start.
-(=.=) :: Domain -> Domain -> Bool
-l =.= r = (dropDot $ unpack l) == (dropDot $ unpack r)
-
-dropDot s | s /= [], last s == '.' = init s
-dropDot s = s
 
 -- | groups resource records into RRsets
 -- where the records in each RRset have
