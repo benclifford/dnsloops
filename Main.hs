@@ -146,6 +146,14 @@ A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
 
+parentDomains :: Domain -> [Domain]
+parentDomains qname = let
+  shreddedDomain = split '.' qname
+  -- TODO BUG: handling of . inside domain labels (rather than as a separator)
+  domainSuffixes = tails shreddedDomain
+  domainParents = (intercalate (pack ".")) <$> domainSuffixes
+  in domainParents
+
 -- | complexResolve must not add final results because
 -- it is used recursively.
 -- but it should record RRsets for GetRRSetQuery results
@@ -153,15 +161,9 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
 complexResolve qname qrrtype = do
 
-  let shreddedDomain = split '.' qname 
-  -- ^ BUG; handling of . inside labels
-  let domainSuffixes = tails shreddedDomain
-  report $ "Domain suffixes: " ++ (show domainSuffixes)
+  let domainSuffixes = parentDomains qname
 
-  forA_ domainSuffixes $ \domainSuffix -> do
-    let domainSuffixByteString = intercalate (pack ".") domainSuffix
-    -- ^ BUG: handling of . inside labels
-    -- cache lookup
+  forA_ domainSuffixes $ \domainSuffixByteString -> do
 
     -- there's subtlety here that I haven't quite figured out
     -- to do with how I want to branch over all the nameservers in an
