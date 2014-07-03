@@ -72,9 +72,6 @@ data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable
 data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
 -- TODO: there should be another answer option that is NoNameserver
 
--- TODO: this implementation uses the local default resolver
--- rather than recursively starting something new
--- which is what should happen (probably via GetRRSetQuery)
 instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
     GetRRSetAnswer a <- query $ GetRRSetQuery d NS
