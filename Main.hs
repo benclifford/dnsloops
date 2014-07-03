@@ -6,7 +6,7 @@ module Main where
 
 import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
-import Data.ByteString.Char8 (pack, split, intercalate, unpack)
+import Data.ByteString.Char8 (pack, unpack)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
 import Data.Ord (comparing)
@@ -145,14 +145,6 @@ populateRootHints =
 A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
-
-parentDomains :: Domain -> [Domain]
-parentDomains qname = let
-  shreddedDomain = split '.' qname
-  -- TODO BUG: handling of . inside domain labels (rather than as a separator)
-  domainSuffixes = tails shreddedDomain
-  domainParents = (intercalate (pack ".")) <$> domainSuffixes
-  in domainParents
 
 -- | complexResolve must not add final results because
 -- it is used recursively.

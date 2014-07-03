@@ -3,7 +3,9 @@
 -- | types and functions for domains
 module Domain where
 
-import Data.ByteString.Char8 (unpack, pack)
+import Control.Applicative ( (<$>) )
+import Data.ByteString.Char8 (unpack, pack, intercalate, split)
+import Data.List (tails)
 import Network.DNS (Domain, RDATA(RD_NS))
 
 {-
@@ -34,5 +36,13 @@ dropDot s = s
 -- the failure some other way... TODO
 rdataNSToDomain :: RDATA -> Domain
 rdataNSToDomain (RD_NS domain) = domain
+
+parentDomains :: Domain -> [Domain]
+parentDomains qname = let
+  shreddedDomain = split '.' qname
+  -- TODO BUG: handling of . inside domain labels (rather than as a separator)
+  domainSuffixes = tails shreddedDomain
+  domainParents = (intercalate (pack ".")) <$> domainSuffixes
+  in domainParents
 
 
