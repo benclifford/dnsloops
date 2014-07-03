@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Char8 (pack, split, intercalate, unpack)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
@@ -73,7 +73,7 @@ instance Qable GetNameserverQuery GetNameserverAnswer where
   runQable q@(GetNameserverQuery d) = do
     GetRRSetAnswer a <- query $ GetRRSetQuery d NS
     case a of
-      Left e -> liftIO $ putStrLn $ "Unhandled: error when getting nameserver for domain " ++ (show d)
+      Left e -> report $ "Unhandled: error when getting nameserver for domain " ++ (show d)
       -- TODO ^ what to record for the error case?
       Right rrs -> forA_ rrs $ \rr -> let
         (RD_NS nsrv) = rdata rr
