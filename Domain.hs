@@ -3,10 +3,13 @@
 -- | types and functions for domains
 module Domain where
 
+import Instances
+
 import Control.Applicative ( (<$>) )
 import Data.ByteString.Char8 (unpack, pack, intercalate, split)
-import Data.List (tails)
-import Network.DNS (Domain, RDATA(RD_NS))
+import Data.List (tails, groupBy, sortBy)
+import Data.Ord (comparing)
+import Network.DNS
 
 {-
 -- | terminology from RFC1035
@@ -44,5 +47,18 @@ ancestorDomains qname = let
   domainSuffixes = tails shreddedDomain
   domainParents = (intercalate (pack ".")) <$> domainSuffixes
   in domainParents
+
+
+-- | groups resource records into RRsets
+-- where the records in each RRset have
+-- the same (qname,qtype)
+rrlistToRRsets :: [ResourceRecord] -> [[ResourceRecord]]
+rrlistToRRsets rrs = let
+  l `eqRRset` r = (rrname l == rrname r)
+               && (rrtype l == rrtype r)
+  key rr = (rrname rr, rrtype rr)
+  compareRRset = comparing key
+  in groupBy eqRRset $ sortBy compareRRset rrs
+
 
 

@@ -9,7 +9,6 @@ import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Char8 (pack, unpack)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
-import Data.Ord (comparing)
 import Data.Typeable
 
 import Network.DNS
@@ -366,17 +365,6 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: when querying nameserver " ++ (show $ resolvInfo server)))
                empty -- TODO something more interesting here
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
-
--- | groups resource records into RRsets
--- where the records in each RRset have
--- the same (qname,qtype)
-rrlistToRRsets :: [ResourceRecord] -> [[ResourceRecord]]
-rrlistToRRsets rrs = let
-  l `eqRRset` r = (rrname l == rrname r)
-               && (rrtype l == rrtype r)
-  key rr = (rrname rr, rrtype rr)
-  compareRRset = comparing key
-  in groupBy eqRRset $ sortBy compareRRset rrs
 
 
 -- TODO:
