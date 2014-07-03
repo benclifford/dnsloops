@@ -494,3 +494,6 @@ rrlistToRRsets rrs = let
 --  ii) root referrals
 --  and generate warnings of such
 
+-- TODO: when querying a root server for a single label, eg "net", an InvalidDomain error
+-- is returned  - perhaps this needs to be terminated with a .?
+
