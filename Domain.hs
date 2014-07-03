@@ -23,6 +23,7 @@ type LLabel = String
 (=.=) :: Domain -> Domain -> Bool
 l =.= r = (dropDot $ unpack l) == (dropDot $ unpack r)
 
+dropDot :: String -> String
 dropDot s | s /= [], last s == '.' = init s
 dropDot s = s
 
