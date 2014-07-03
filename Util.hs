@@ -14,3 +14,6 @@ forA_ l f = asum (fmap f l)
 report :: String -> Q any ()
 report s = liftIO $ putStrLn s
 
+debugReport :: String -> Q any ()
+debugReport s = return ()
+-- debugReport s = liftIO $ putStrLn s

@@ -195,7 +195,7 @@ complexResolve qname qrrtype = do
           (ResolverAnswer r) <- query $ ResolverQuery
             (defaultResolvConf { resolvInfo = RCHostName rd })
             qname qrrtype
-          report $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
+          debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
 
           case r of 
