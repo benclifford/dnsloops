@@ -52,7 +52,7 @@ liftDNSError (Right v) = Right v
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
-data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
+data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 
 instance Qable GetRRSetQuery GetRRSetAnswer where
   runQable q@(GetRRSetQuery d ty) =
@@ -74,7 +74,7 @@ instance Qable GetNameserverQuery GetNameserverAnswer where
     case a of
       Left e -> report $ "Unhandled: error when getting nameserver for domain " ++ (show d)
       -- TODO ^ what to record for the error case?
-      Right rrs -> forA_ rrs $ \rr -> let
+      Right (CRRSet rrs) -> forA_ rrs $ \rr -> let
         (RD_NS nsrv) = rdata rr
         in qrecord q (GetNameserverAnswer nsrv)
 
@@ -129,7 +129,7 @@ populateRootHints =
       (qrecord (GetNameserverQuery rootName)
                (GetNameserverAnswer aName) *> empty)
   <|> (qrecord (GetRRSetQuery aName A)
-               (GetRRSetAnswer $ Right [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
+               (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
   where rootName = pack ""
         aName = pack "a.root-servers.net"
         aIP = toIPv4 [198,41,0,4]
@@ -177,7 +177,7 @@ complexResolve qname qrrtype = do
     case nserverAddressRRSet of 
       (GetRRSetAnswer (Left e)) ->
         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
-      (GetRRSetAnswer (Right aRRset)) -> do
+      (GetRRSetAnswer (Right (CRRSet aRRset))) -> do
 
         forA_ aRRset $ \arec -> do
           report $ "Nameserver " ++ (show ns) ++ " has address: " ++ (show arec)
@@ -316,8 +316,8 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                     case cnamedRRSet of
                       GetRRSetAnswer (Left err) ->
                         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer $ Left $ "When resolving CNAME: " ++ err) *> empty
-                      r@(GetRRSetAnswer (Right rrset)) ->
-                        qrecord (GetRRSetQuery qname qrrtype) r *> empty
+                      GetRRSetAnswer a@(Right _) ->
+                        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer a) *> empty
                 )
 
         -- Two kinds of name not found: one from the name not existing, and
@@ -350,7 +350,7 @@ recordRRlist rs = let
           (
              let
                exampleRR = head rrset
-               in (qrecord (GetRRSetQuery (dropDot $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset)))
+               in (qrecord (GetRRSetQuery (dropDot $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right $ canonicaliseRRSet rrset)))
           )
       )
 

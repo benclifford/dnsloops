@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ParallelListComp #-}
 
 -- | types and functions for domains
 module Domain where
@@ -7,7 +8,9 @@ import Instances
 
 import Control.Applicative ( (<$>) )
 import Data.ByteString.Char8 (unpack, pack, intercalate, split)
-import Data.List (tails, groupBy, sortBy)
+import Data.Function (on)
+import Data.List (tails, groupBy, sortBy, sort, nub)
+import Data.Monoid ( (<>) )
 import Data.Ord (comparing)
 import Network.DNS
 
@@ -60,5 +63,22 @@ rrlistToRRsets rrs = let
   compareRRset = comparing key
   in groupBy eqRRset $ sortBy compareRRset rrs
 
+canonicaliseRRSet :: [ResourceRecord] -> CRRSet
+canonicaliseRRSet rs = CRRSet $ sortBy compareWithoutRDLen rs
 
+compareWithoutRDLen :: ResourceRecord -> ResourceRecord -> Ordering
+compareWithoutRDLen l r = ( (compare `on` rrname) l r )
+                       <> ( (compare `on` rrtype) l r )
+                       <> ( (compare `on` rrttl) l r )
+                       <> ( (compare `on` rdata) l r )
+
+-- | an rrset modulo some canonicalisation.
+-- this constructor maybe shouldn't be exported?
+newtype CRRSet = CRRSet [ResourceRecord]
+  deriving (Show)
+
+-- the two lists should already be in order by virtual of canonicaliseRRSet being
+-- (hopefully) the only (smart) constructor allowed
+instance Eq CRRSet where
+  (CRRSet a) == (CRRSet b) = nub [compareWithoutRDLen a' b' | a' <- a | b' <- b] == [EQ]
 
