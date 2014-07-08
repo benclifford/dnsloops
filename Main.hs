@@ -289,20 +289,7 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                       -- rname and type that we requested
           -> do
                report $ "Processing answer records: " ++ (show $ ans)
-               -- TODO: group the answers into RRSets of common name and type, rather than pushing RRSet answers as individual rows.
-               -- so group ans into rrsets, and iterate over that
-               -- using an RR-list to RRsets conversion function
-               -- that can be reused
-               let ansRRsets = rrlistToRRsets ans
-               forA_ ansRRsets (\rrset ->
-                 (report $ "cacheResolverAnswer: ANSWER RRset: " ++ show rrset)
-                <|>
-                 (
-                  let
-                    exampleRR = head rrset
-                    in (qrecord (GetRRSetQuery (dropDot $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset))
-                 ))
-                 )
+               recordRRlist ans
                empty
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
                -- TODO: cache any additional data that we got here
@@ -365,6 +352,19 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: when querying nameserver " ++ (show $ resolvInfo server)))
                empty -- TODO something more interesting here
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
+
+
+recordRRlist rs = let
+  rrsets = rrlistToRRsets rs
+  in forA_ rrsets (\rrset ->
+          (report $ "cacheResolverAnswer: ANSWER RRset: " ++ show rrset)
+          <|>
+          (
+             let
+               exampleRR = head rrset
+               in (qrecord (GetRRSetQuery (dropDot $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right rrset)))
+          )
+      )
 
 
 -- TODO:
