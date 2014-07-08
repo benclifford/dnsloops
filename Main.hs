@@ -475,3 +475,7 @@ recordRRlist rs = let
 -- TODO: some kind of balliwick awareness a la http://homepage.ntlworld.com/jonathan.deboynepollard/FGA/dns-server-bailiwick.html
 
 -- TODO: detect cache-poisoning (perhaps overlapping with bailiwick handling?) djb has interesting stuff here http://cr.yp.to/djbdns/notes.html
+
+-- TODO:  according to djb doc abouve, "RFC 1034 says that an alias ``should'' not point to another alias."
+-- Detect this and issue a warning
+
