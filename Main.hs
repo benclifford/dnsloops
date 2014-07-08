@@ -473,3 +473,5 @@ recordRRlist rs = let
 -- TODO: make an ANY query against any name that has been requested, so as to check it is returned and that it is the same.
 
 -- TODO: some kind of balliwick awareness a la http://homepage.ntlworld.com/jonathan.deboynepollard/FGA/dns-server-bailiwick.html
+
+-- TODO: detect cache-poisoning (perhaps overlapping with bailiwick handling?) djb has interesting stuff here http://cr.yp.to/djbdns/notes.html
