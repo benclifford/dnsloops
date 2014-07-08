@@ -250,21 +250,8 @@ cacheResolverAnswer server qname qrrtype r = do
                          (qrecord (GetNameserverQuery $ dropDot $ delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
                                   (GetNameserverAnswer (dropDot $ rdataNSToDomain rd)) *> empty))
                 )
-              <|>
-                (
-                 -- TODO now this is a bit weird: I don't necessary want to
-                 -- go parallel for each record: I want to make up, potentially,
-                 -- grouped rrsets (grouped by rrname/rrtype) and go parallel
-                 -- over those. Although in practice do I ever see the same
-                 -- rrname/rrtype more than once in additional data?
-                 -- At least put a check in for it and give a WARNING about
-                 -- unhandled behaviour
-                 forA_ (rrlistToRRsets $ additional df) (\adRRset -> 
-                      (report $ "cacheResolverAnswer: DELEGATION ADDITIONAL DATA: " ++ (show adRRset))
-  
-                   *> (qrecord (GetRRSetQuery (dropDot $ rrname $ head adRRset) (rrtype $ head adRRset))
-                               (GetRRSetAnswer (Right adRRset))
-                      )
+              <|> (recordRRlist (authority df) *> empty)
+              <|> (recordRRlist (additional df) *> empty)
 {-
 
 -- TODO: this can hopefully supercede GetNameserver more generally.
@@ -273,13 +260,6 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
 
 
 -}
-                 *> empty
-                  ) 
-                 *>
-                   -- TODO: we also have some additional data to validate and push into the db
-                empty
-               )
-             *> empty
         (Right df) | (rcode . flags . header) df == NoErr
                    , ans <- answer df
                    , ans /= []
