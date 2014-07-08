@@ -267,10 +267,11 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                    , [qrrtype] <- (nub (rrtype <$> ans))
                       -- check we only got answer records for the
                       -- rname and type that we requested
-          -> do
-               report $ "Processing answer records: " ++ (show $ ans)
-               recordRRlist ans
-               empty
+          -> 
+                (report $ "Processing answer records: " ++ (show $ ans))
+            <|> (recordRRlist ans *> empty)
+            <|> (recordRRlist (authority df) *> empty)
+            <|> (recordRRlist (additional df) *> empty)
                -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
                -- TODO: cache any additional data that we got here
 
@@ -293,6 +294,10 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                -- but we need to also launch a new lookup of the
                -- CNAME and transpose any results from that into
                -- results for this lookup.
+                (recordRRlist ans *> empty) -- so we'll have both the cname and the transposed answers recorded
+            <|> (recordRRlist (authority df) *> empty)
+            <|> (recordRRlist (additional df) *> empty)
+            <|>
                ( do
                     let cql = rdata <$>
                                      (filter (\rr -> rrname rr =.= qname
