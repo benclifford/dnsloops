@@ -252,30 +252,7 @@ cacheResolverAnswer server qname qrrtype r = do
                 )
               <|> (recordRRlist (authority df) *> empty)
               <|> (recordRRlist (additional df) *> empty)
-{-
 
--- TODO: this can hopefully supercede GetNameserver more generally.
-data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
-data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
-
-
--}
--- TODO: BUG: this is misfiring when receiving some CNAME redirections
--- rather than passing on to the CNAME case.
-        (Right df) | (rcode . flags . header) df == NoErr
-                   , ans <- answer df
-                   , ans /= []
-                   , [qrrname] <- (nub (rrname <$> ans))
-                   , [qrrtype] <- (nub (rrtype <$> ans))
-                      -- check we only got answer records for the
-                      -- rname and type that we requested
-          -> 
-                (report $ "Processing answer records: " ++ (show $ ans))
-            <|> (recordRRlist ans *> empty)
-            <|> (recordRRlist (authority df) *> empty)
-            <|> (recordRRlist (additional df) *> empty)
-               -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
-               -- TODO: cache any additional data that we got here
 
         -- The CNAME case:
         -- If we didn't request a cname, but the answer
@@ -319,6 +296,32 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                       GetRRSetAnswer a@(Right _) ->
                         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer a) *> empty
                 )
+
+
+
+
+{-
+
+-- TODO: this can hopefully supercede GetNameserver more generally.
+data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
+data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
+
+
+-}
+        (Right df) | (rcode . flags . header) df == NoErr
+                   , ans <- answer df
+                   , ans /= []
+                   , [qrrname] <- (nub (rrname <$> ans))
+                   , [qrrtype] <- (nub (rrtype <$> ans))
+                      -- check we only got answer records for the
+                      -- rname and type that we requested
+          -> 
+                (report $ "Processing answer records: " ++ (show $ ans))
+            <|> (recordRRlist ans *> empty)
+            <|> (recordRRlist (authority df) *> empty)
+            <|> (recordRRlist (additional df) *> empty)
+               -- TODO: validation of other stuff that should or should not be here... (for example, is this an expected answer? is whatever is in additional and authority well formed?)
+               -- TODO: cache any additional data that we got here
 
         -- Two kinds of name not found: one from the name not existing, and
         -- one for the name existing but not having values of the
