@@ -260,6 +260,8 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
 
 
 -}
+-- TODO: BUG: this is misfiring when receiving some CNAME redirections
+-- rather than passing on to the CNAME case.
         (Right df) | (rcode . flags . header) df == NoErr
                    , ans <- answer df
                    , ans /= []
@@ -297,6 +299,7 @@ data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (
                 (recordRRlist ans *> empty) -- so we'll have both the cname and the transposed answers recorded
             <|> (recordRRlist (authority df) *> empty)
             <|> (recordRRlist (additional df) *> empty)
+            <|> (report $ "Following CNAME: "++(show ans))
             <|>
                ( do
                     let cql = rdata <$>
@@ -478,4 +481,6 @@ recordRRlist rs = let
 
 -- TODO:  according to djb doc abouve, "RFC 1034 says that an alias ``should'' not point to another alias."
 -- Detect this and issue a warning
+
+-- TODO: detect double/multiple CNAME chain and report warning - somewhere says CNAMEs should not point to CNAMEs.
 
