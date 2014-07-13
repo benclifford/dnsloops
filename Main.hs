@@ -84,7 +84,7 @@ main = do
 
   [h, tys] <- getArgs
 
-  let hostname = pack h
+  let hostname = ensureDot $ pack h
   let ty = read tys
 
   (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
@@ -131,7 +131,7 @@ populateRootHints =
   <|> (qrecord (GetRRSetQuery aName A)
                (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
   where rootName = pack ""
-        aName = pack "a.root-servers.net"
+        aName = pack "a.root-servers.net."
         aIP = toIPv4 [198,41,0,4]
         noLen = -1
 
@@ -247,8 +247,8 @@ cacheResolverAnswer server qname qrrtype r = do
           ->    (report $ "cacheResolverAnswer: This answer is a DELEGATION of zone " ++ (show delegzone))
               <|> (forA_ (rdata <$> (authority df)) (\rd -> 
                          (report $ "cacheResolverAnswer: DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
-                         (qrecord (GetNameserverQuery $ dropDot $ delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
-                                  (GetNameserverAnswer (dropDot $ rdataNSToDomain rd)) *> empty))
+                         (qrecord (GetNameserverQuery $ delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
+                                  (GetNameserverAnswer (rdataNSToDomain rd)) *> empty))
                 )
               <|> (recordRRlist (authority df) *> empty)
               <|> (recordRRlist (additional df) *> empty)
@@ -286,7 +286,7 @@ cacheResolverAnswer server qname qrrtype r = do
                     -- liftIO $ error $ "cql = " ++ (show cql) ++ ", ans = " ++ (show ans) ++ ", qname = " ++ (show qname)
                     let [RD_CNAME cqname] = cql
                     -- liftIO $ error $ "cqname to resolve: " ++ (show cqname)
-                    cnamedRRSet <- query (GetRRSetQuery (dropDot cqname) qrrtype)
+                    cnamedRRSet <- query (GetRRSetQuery cqname qrrtype)
                     -- this will either be a Left or a Right
                     -- if its a Right, transpose that RRSet
                     -- if its a Left, make a stack-trace like nested Left
@@ -353,7 +353,7 @@ recordRRlist rs = let
           (
              let
                exampleRR = head rrset
-               in (qrecord (GetRRSetQuery (dropDot $ rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right $ canonicaliseRRSet rrset)))
+               in (qrecord (GetRRSetQuery (rrname exampleRR) (rrtype exampleRR)) (GetRRSetAnswer (Right $ canonicaliseRRSet rrset)))
           )
       )
 

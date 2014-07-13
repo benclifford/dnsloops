@@ -38,6 +38,18 @@ dropDot s | s' <- unpack s
           , last s' == '.' = pack $ init s'
 dropDot s = s
 
+ensureDot :: Domain -> Domain
+ensureDot s | unpack s == [] = pack "."
+ensureDot s | s' <- unpack s
+          , s' /= []
+          , last s' /= '.' = pack $ (s' ++ ".")
+ensureDot s | s' <- unpack s
+          , s' /= []
+          , last s' == '.' = s
+ensureDot s = error $ "unexpected case in ensureDot: " ++ (show s)
+
+
+
 -- | This might fail. Ideally I'd return a Maybe or handle
 -- the failure some other way... TODO
 rdataNSToDomain :: RDATA -> Domain
