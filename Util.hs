@@ -1,6 +1,6 @@
 module Util where
 
-import Control.Applicative (Alternative)
+import Control.Applicative (Alternative, pure)
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (asum, Foldable)
 import Q (Q)
@@ -10,6 +10,8 @@ import Q (Q)
 -- (c.f. for in Traversable (?))
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
+
+shred l = forA_ l pure
 
 report :: String -> Q any ()
 report s = liftIO $ putStrLn s

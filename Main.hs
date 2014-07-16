@@ -148,9 +148,9 @@ complexResolve qname qrrtype = do
     -- uniquely numbered query type or some such? Not sure...
 
     report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
-    ns <- getNameServer domainSuffixByteString
+    nses <- getNameServers domainSuffixByteString
+    ns <- shred nses
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
-
     -- TODO BUG: this pattern match will fail if the query
     -- returns a failure. That query should perhaps cascade,
     -- or generate a warning, or what? Probably need to think
@@ -186,17 +186,16 @@ complexResolve qname qrrtype = do
 
   empty
 
-getNameServer :: Typeable final => Domain -> Q final Domain
-getNameServer domain = do
+getNameServers :: Typeable final => Domain -> Q final [Domain]
+getNameServers domain = do
   GetRRSetAnswer a <- query (GetRRSetQuery domain NS)
   case a of
     Left e ->    (report $ "Unhandled: error when getting nameserver for domain " ++ (show domain))
               *> empty
     -- TODO ^ what to record for the error case? at present, we don't return
     -- anything tied to the query, not even an error
-    Right (CRRSet rrs) -> forA_ rrs $ \rr -> let
-      (RD_NS nsrv) = rdata rr
-      in return nsrv
+    Right (CRRSet rrs) -> return (   ( (\(RD_NS nsrv) -> nsrv)  . rdata ) <$> rrs)
+
 
 cacheResolverAnswer server qname qrrtype r = do
       -- so this might be our answer! (one day)
