@@ -50,7 +50,6 @@ liftDNSError :: Either DNSError a -> Either ResolverError a
 liftDNSError (Left e) = Left (ResolverDNSError e)
 liftDNSError (Right v) = Right v
 
--- TODO: this can hopefully supercede GetNameserver more generally.
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
 data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 
@@ -63,21 +62,6 @@ instance Qable GetRRSetQuery GetRRSetAnswer where
     -- I'm unclear in general about when returning a () vs
     -- returning empty makes sense.
     -- TODO: what to do with the results?
-
-data GetNameserverQuery = GetNameserverQuery Domain deriving (Show, Eq, Typeable)
-data GetNameserverAnswer = GetNameserverAnswer Domain deriving (Show, Eq, Typeable)
--- TODO: there should be another answer option that is NoNameserver
-
-instance Qable GetNameserverQuery GetNameserverAnswer where
-  runQable q@(GetNameserverQuery d) = do
-    GetRRSetAnswer a <- query $ GetRRSetQuery d NS
-    case a of
-      Left e -> report $ "Unhandled: error when getting nameserver for domain " ++ (show d)
-      -- TODO ^ what to record for the error case?
-      Right (CRRSet rrs) -> forA_ rrs $ \rr -> let
-        (RD_NS nsrv) = rdata rr
-        in qrecord q (GetNameserverAnswer nsrv)
-
 
 main = do
   putStrLn "DNSLoops main"
@@ -126,8 +110,8 @@ main = do
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
 populateRootHints = 
-      (qrecord (GetNameserverQuery rootName)
-               (GetNameserverAnswer aName) *> empty)
+      (qrecord (GetRRSetQuery rootName NS)
+               (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord rootName NS 0 noLen (RD_NS aName)]) *> empty)
   <|> (qrecord (GetRRSetQuery aName A)
                (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
   where rootName = pack ""
@@ -164,7 +148,7 @@ complexResolve qname qrrtype = do
     -- uniquely numbered query type or some such? Not sure...
 
     report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
-    (GetNameserverAnswer ns) <- query (GetNameserverQuery domainSuffixByteString)
+    ns <- getNameServer domainSuffixByteString
     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
 
     -- TODO BUG: this pattern match will fail if the query
@@ -202,8 +186,17 @@ complexResolve qname qrrtype = do
 
   return ()
 
-
-
+getNameServer :: Typeable final => Domain -> Q final Domain
+getNameServer domain = do
+  GetRRSetAnswer a <- query (GetRRSetQuery domain NS)
+  case a of
+    Left e ->    (report $ "Unhandled: error when getting nameserver for domain " ++ (show domain))
+              *> empty
+    -- TODO ^ what to record for the error case? at present, we don't return
+    -- anything tied to the query, not even an error
+    Right (CRRSet rrs) -> forA_ rrs $ \rr -> let
+      (RD_NS nsrv) = rdata rr
+      in return nsrv
 
 cacheResolverAnswer server qname qrrtype r = do
       -- so this might be our answer! (one day)
@@ -246,9 +239,8 @@ cacheResolverAnswer server qname qrrtype r = do
                    , [delegzone] <- (nub (rrname <$> (authority df)))
           ->    (report $ "cacheResolverAnswer: This answer is a DELEGATION of zone " ++ (show delegzone))
               <|> (forA_ (rdata <$> (authority df)) (\rd -> 
-                         (report $ "cacheResolverAnswer: DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *>
-                         (qrecord (GetNameserverQuery $ delegzone)  -- TODO this is pretty ugly - I should stop using strings so much for passing around domains, and instead use a list of labels
-                                  (GetNameserverAnswer (rdataNSToDomain rd)) *> empty))
+                         (report $ "cacheResolverAnswer: DELEGATION of zone " ++ (show delegzone) ++ " to " ++ (show rd)) *> empty
+                                  )
                 )
               <|> (recordRRlist (authority df) *> empty)
               <|> (recordRRlist (additional df) *> empty)
@@ -297,17 +289,6 @@ cacheResolverAnswer server qname qrrtype r = do
                         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer a) *> empty
                 )
 
-
-
-
-{-
-
--- TODO: this can hopefully supercede GetNameserver more generally.
-data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
-data GetRRSetAnswer = GetRRSetAnswer (Either String [ResourceRecord]) deriving (Show, Eq, Typeable)
-
-
--}
         (Right df) | (rcode . flags . header) df == NoErr
                    , ans <- answer df
                    , ans /= []
