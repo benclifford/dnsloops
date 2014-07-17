@@ -12,7 +12,7 @@ Executable dnsloops-test
   ghc-options: -main-is Test
 
 Executable dnsloops
-  Build-depends: base, dns, free-operational, mtl, bytestring, iproute, transformers
+  Build-depends: base, dns >=1.4, free-operational, mtl, bytestring, iproute, transformers
   main-is: Main.hs
   ghc-options: -main-is Main
 
