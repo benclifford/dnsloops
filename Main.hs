@@ -149,18 +149,19 @@ complexResolve qname qrrtype = do
 
     report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
     nses <- getNameServers domainSuffixByteString
-    ns <- shred nses
-    report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
-    -- TODO BUG: this pattern match will fail if the query
-    -- returns a failure. That query should perhaps cascade,
-    -- or generate a warning, or what? Probably need to think
-    -- about what happens in the normal algorithm when this
-    -- fails.
-    -- (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
-    nserverAddressRRSet <- query (GetRRSetQuery ns A)
-    case nserverAddressRRSet of 
-      (GetRRSetAnswer (Left e)) ->
+    forA_ nses $ \ns -> do
+     report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
+     -- TODO BUG: this pattern match will fail if the query
+     -- returns a failure. That query should perhaps cascade,
+     -- or generate a warning, or what? Probably need to think
+     -- about what happens in the normal algorithm when this
+     -- fails.
+     -- (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
+     nserverAddressRRSet <- query (GetRRSetQuery ns A)
+     case nserverAddressRRSet of 
+      (GetRRSetAnswer (Left e)) -> do
         qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
+        empty
       (GetRRSetAnswer (Right (CRRSet aRRset))) -> do
 
         forA_ aRRset $ \arec -> do
@@ -181,9 +182,8 @@ complexResolve qname qrrtype = do
           debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
         empty
-
-  -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
-
+     empty
+    empty
   empty
 
 getNameServers :: Typeable final => Domain -> Q final [Domain]
