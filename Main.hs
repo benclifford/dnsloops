@@ -184,7 +184,7 @@ complexResolve qname qrrtype = do
 
   -- the above may not continue in the monad - it will only continue if one or more of the threads generates a non-empty value.  so using do notation is maybe not the right thing to be doing here.
 
-  return ()
+  empty
 
 getNameServer :: Typeable final => Domain -> Q final Domain
 getNameServer domain = do
