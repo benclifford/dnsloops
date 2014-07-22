@@ -138,7 +138,7 @@ iRunViewedQ i = case i of
     iRunQ (k v)
 
   (QLaunch q) :>>= k -> do
-    liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
+    -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
     prevs <- previousLaunches <$> get
     -- liftIO $ putStr "Previously launched queries: "
     -- liftIO $ print prevs
@@ -152,17 +152,21 @@ iRunViewedQ i = case i of
       iRunQ p
       return ()
      else do
-      liftIO $ putStrLn $ "Duplicate query submission. Not launching again."
+      -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Duplicate query submission. Not launching again."
       return ()
     iRunQ (k ())
 
   (QRecord q a) :>>= k -> do
-    liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
+
+    -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
     -- is this new?
     rs <- previousResultsForQuery q
-    if not (a `elem` rs) then processNewResult q a
-     else liftIO $ putStrLn "Duplicate result. Not processing as new result"
+    if not (a `elem` rs) then do
+       
+       liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
+       processNewResult q a
+     else return () -- TODO: maybe want to log this in debug mode? liftIO $ putStrLn "Duplicate result. Not processing as new result"
     iRunQ (k ())
 
   (QPull q) :>>= k -> do
