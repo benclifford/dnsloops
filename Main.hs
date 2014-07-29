@@ -149,6 +149,19 @@ complexResolve qname qrrtype = do
 
     report $ "Requesting nameserver for domain " ++ (unpack domainSuffixByteString)
     nses <- getNameServers domainSuffixByteString
+
+
+-- TODO: what to do with the answers? The forA_s put together the results of
+-- all the resolver answers at two levels, irrespective of whether they came
+-- from the "same" resolver or not.
+-- I guess I want to do the qrecord failure if there are no results at all
+-- but I don't get to know that 'till the end. hm.
+-- so maybe reporting a failure here is the wrong thing to do?
+-- and perhaps I should be doing it as post-run analysis of what happened?
+-- or maybe only certain failures (such as declaring non-existence, rather
+-- than a timeout) should be reported as a failure.
+-- So server interaction failure is different from non-existence failure,
+-- which is a comment about the state of the data model
     forA_ nses $ \ns -> do
      report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
      -- TODO BUG: this pattern match will fail if the query
@@ -160,7 +173,7 @@ complexResolve qname qrrtype = do
      nserverAddressRRSet <- query (GetRRSetQuery ns A)
      case nserverAddressRRSet of 
       (GetRRSetAnswer (Left e)) -> do
-        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
+        -- TODO: see above:   qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
         empty
       (GetRRSetAnswer (Right (CRRSet aRRset))) -> do
 
