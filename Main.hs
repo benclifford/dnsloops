@@ -481,3 +481,7 @@ recordRRlist rs = let
 -- TODO: detect double/multiple CNAME chain and report warning - somewhere says CNAMEs should not point to CNAMEs.
 
 -- TODO: some kind of "progress from root" check that checks that we could have resolved the answer(s) without needing weird caching to already be in place; warning if this is not the case
+
+-- TODO: multicast DNS resolving. also note 13:13  * David-T discovers multicast DNS (rfc6762) uses UTF-8 not punycode
+--  this could probably fit the same interface as using a direct recursive resolver. and perhaps anything nsswitchy eg YP/NIS
+
