@@ -18,6 +18,7 @@ import System.IO.Error
 
 import Domain
 import Instances
+import MainArgs
 import Q
 import Util
 import Control.Monad
@@ -66,10 +67,9 @@ instance Qable GetRRSetQuery GetRRSetAnswer where
 main = do
   putStrLn "DNSLoops main"
 
-  [h, tys] <- getArgs
+  (h, ty) <- getOptions
 
   let hostname = ensureDot $ pack h
-  let ty = read tys
 
   (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
 
