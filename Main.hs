@@ -65,6 +65,21 @@ instance Qable GetRRSetQuery GetRRSetAnswer where
     -- returning empty makes sense.
     -- TODO: what to do with the results?
 
+-- There are two stages to processing:
+-- * the dynamic stage happens in the Q monad, and so code
+--   (eg checking rules) can launch new queries and cause
+--   new answers to appear. Because of this, some checks
+--   (such as processing over the entire list of results
+--   of a query) cannot be performed.
+-- * the static stage happens in the IO monad, or functionally,
+--   with read-only access to the query database. Processing
+--   performed at this stage cannot launch new queries and
+--   so no new answers will appear. This means we can run
+--   queries such as examining the entire list of results
+--   of a query.
+type DynamicStage = Q GetRRSetAnswer GetRRSetAnswer
+type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
+
 main = do
   putStrLn "DNSLoops main"
 
@@ -72,18 +87,6 @@ main = do
 
   let hostname = ensureDot $ pack h
 
-  -- There are two stages to processing:
-  -- * the dynamic stage happens in the Q monad, and so code
-  --   (eg checking rules) can launch new queries and cause
-  --   new answers to appear. Because of this, some checks
-  --   (such as processing over the entire list of results
-  --   of a query) cannot be performed.
-  -- * the static stage happens in the IO monad, or functionally,
-  --   with read-only access to the query database. Processing
-  --   performed at this stage cannot launch new queries and
-  --   so no new answers will appear. This means we can run
-  --   queries such as examining the entire list of results
-  --   of a query.
   putStrLn "Dynamic stage:"
 
   (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
@@ -97,9 +100,6 @@ main = do
     xxxt <- ask
     displayStats
     displayStatsByType
-
-type DynamicStage = Q GetRRSetAnswer GetRRSetAnswer
-type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
 
 -- | TODO: maybe should be log-level aware?
 putIO = liftIO . putStrLn
