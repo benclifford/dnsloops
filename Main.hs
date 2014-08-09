@@ -94,6 +94,20 @@ main = do
 
   displayStats db
 
+  displayStatsByType db
+
+type StaticStage = DB GetRRSetAnswer -> IO ()
+
+displayStats :: StaticStage
+displayStats db = do
+  putStrLn   "Database statistics:"
+  putStrLn $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
+  putStrLn $ "  Number of previous results: " ++ (show $ length $ previousResults db)
+  putStrLn $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
+  putStrLn $ "  Number of final results: " ++ (show $ length $ finalResults db)
+
+displayStatsByType :: StaticStage
+displayStatsByType db = do
   let launchTypes = typeOfPreviousLaunch <$> ((previousLaunches db))
         where typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
@@ -118,16 +132,6 @@ main = do
     putStr ": "
     putStr $ show $ length $ filter (== lt) $ resultTypes
     putStrLn ""
-
-type StaticStage = DB GetRRSetAnswer -> IO ()
-
-displayStats :: StaticStage
-displayStats db = do
-  putStrLn   "Database statistics:"
-  putStrLn $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
-  putStrLn $ "  Number of previous results: " ++ (show $ length $ previousResults db)
-  putStrLn $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
-  putStrLn $ "  Number of final results: " ++ (show $ length $ finalResults db)
 
 
 
