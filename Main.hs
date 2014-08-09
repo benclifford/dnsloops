@@ -98,7 +98,7 @@ main = do
     displayStats
     displayStatsByType
 
-
+type DynamicStage = Q GetRRSetAnswer GetRRSetAnswer
 type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
 
 -- | TODO: maybe should be log-level aware?
@@ -141,6 +141,7 @@ displayStatsByType = do
 
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
+populateRootHints :: DynamicStage
 populateRootHints = 
       (qrecord (GetRRSetQuery rootName NS)
                (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord rootName NS 0 noLen (RD_NS aName)]) *> empty)
