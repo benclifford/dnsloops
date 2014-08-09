@@ -71,13 +71,20 @@ main = do
 
   let hostname = ensureDot $ pack h
 
+  putStrLn "Dynamic stage:"
+
   (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
 
-  putStrLn "Database stats:"
-  putStrLn $ "Number of previous launches: " ++ (show $ length $ previousLaunches db)
-  putStrLn $ "Number of previous results: " ++ (show $ length $ previousResults db)
-  putStrLn $ "Number of previous pulls: " ++ (show $ length $ previousPulls db)
-  putStrLn $ "Number of final results: " ++ (show $ length $ finalResults db)
+  putStrLn "Result of main query: "
+  print `mapM` res
+
+  putStrLn "Static stage:"
+
+  putStrLn   "Database statistics:"
+  putStrLn $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
+  putStrLn $ "  Number of previous results: " ++ (show $ length $ previousResults db)
+  putStrLn $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
+  putStrLn $ "  Number of final results: " ++ (show $ length $ finalResults db)
 
   let launchTypes = typeOfPreviousLaunch <$> ((previousLaunches db))
         where typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
@@ -104,8 +111,6 @@ main = do
     putStr $ show $ length $ filter (== lt) $ resultTypes
     putStrLn ""
 
-  putStrLn "Final result in Main: "
-  print `mapM` res
 
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
