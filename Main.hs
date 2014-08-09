@@ -504,7 +504,7 @@ recordRRlist rs = let
 -- TODO: when querying a root server for a single label, eg "net", an InvalidDomain error
 -- is returned  - perhaps this needs to be terminated with a .?
 
--- TODO: make an ANY query against any name that has been requested, so as to check it is returned and that it is the same.
+-- TODO: make an ANY query against any name that has been requested, so as to check it is returned and that (the appropriate subset) is returned. (If not, the relevant subset should be injected as an RRset)
 
 -- TODO: some kind of balliwick awareness a la http://homepage.ntlworld.com/jonathan.deboynepollard/FGA/dns-server-bailiwick.html
 
