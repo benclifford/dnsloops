@@ -6,6 +6,7 @@ module Main where
 
 import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader (runReaderT, ask, ReaderT ())
 import Data.ByteString.Char8 (pack, unpack)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
@@ -92,32 +93,38 @@ main = do
 
   putStrLn "Static stage:"
 
-  displayStats db
+  (flip runReaderT) db $ do
+    xxxt <- ask
+    displayStats
+    displayStatsByType
 
-  displayStatsByType db
 
-type StaticStage = DB GetRRSetAnswer -> IO ()
+type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
+
+-- | TODO: maybe should be log-level aware?
+putIO = liftIO . putStrLn
 
 displayStats :: StaticStage
-displayStats db = do
-  putStrLn   "Database statistics:"
-  putStrLn $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
-  putStrLn $ "  Number of previous results: " ++ (show $ length $ previousResults db)
-  putStrLn $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
-  putStrLn $ "  Number of final results: " ++ (show $ length $ finalResults db)
+displayStats = do
+  db <- ask
+  putIO   "Database statistics:"
+  putIO $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
+  putIO $ "  Number of previous results: " ++ (show $ length $ previousResults db)
+  putIO $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
+  putIO $ "  Number of final results: " ++ (show $ length $ finalResults db)
 
 displayStatsByType :: StaticStage
-displayStatsByType db = do
+displayStatsByType = do
+  db <- ask
   let launchTypes = typeOfPreviousLaunch <$> ((previousLaunches db))
         where typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
-  putStrLn $ "Launch types: " ++ (show $ nub launchTypes)
-  forM_ (nub launchTypes) $ \lt -> do
-    putStr "  "
-    putStr (show lt)
-    putStr ": "
-    putStr $ show $ length $ filter (== lt) $ launchTypes
-    putStrLn ""
+  putIO $ "Launch types: " ++ (show $ nub launchTypes)
+  forM_ (nub launchTypes) $ \lt -> putIO $ 
+       "  "
+    ++ (show lt)
+    ++ ": "
+    ++ (show $ length $ filter (== lt) $ launchTypes)
 
   -- we could get the type of a here, but there is slightly
   -- more information contained in q because multiple
@@ -125,15 +132,12 @@ displayStatsByType db = do
   let resultTypes = typeOfPreviousResult <$> ((previousResults db))
         where typeOfPreviousResult (PreviousResult q a) = typeOf q
 
-  putStrLn $ "Result types: " ++ (show $ nub resultTypes)
-  forM_ (nub resultTypes) $ \lt -> do
-    putStr "  "
-    putStr (show lt)
-    putStr ": "
-    putStr $ show $ length $ filter (== lt) $ resultTypes
-    putStrLn ""
-
-
+  putIO $ "Result types: " ++ (show $ nub resultTypes)
+  forM_ (nub resultTypes) $ \lt -> putIO $
+       "  "
+    ++ (show lt)
+    ++ ": "
+    ++ (show $ length $ filter (== lt) $ resultTypes)
 
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
