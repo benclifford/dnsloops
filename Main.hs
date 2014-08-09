@@ -89,7 +89,9 @@ main = do
 
   putStrLn "Dynamic stage:"
 
-  (res, db) <- runQ $ populateRootHints <|> (query $ GetRRSetQuery hostname ty)
+  (res, db) <- runQ $
+        populateRootHints
+    <|> (query $ GetRRSetQuery hostname ty)
 
   putStrLn "Result of main query: "
   print `mapM` res
