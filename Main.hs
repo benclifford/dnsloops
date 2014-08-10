@@ -99,7 +99,6 @@ main = do
   putStrLn "Static stage:"
 
   (flip runReaderT) db $ do
-    xxxt <- ask
     displayStats
     displayStatsByType
 
