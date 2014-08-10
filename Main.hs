@@ -421,7 +421,11 @@ recordRRlist rs = let
 
 -- TODO: check that master in SOA matches a nameserver
 -- (is that a requirement of spec) and give report
--- when that is not the case
+-- when that is not the case. If the SOA nameserver
+-- is not in the nameserver RRsets, push it out as an
+-- additional RRset of one element to cause queries
+-- to run against it (triggered by a command line
+-- option?)
 
 -- TODO: provenance check that we can get the answer
 -- when only on ipv6
@@ -513,7 +517,7 @@ recordRRlist rs = let
 -- TODO:  according to djb doc abouve, "RFC 1034 says that an alias ``should'' not point to another alias."
 -- Detect this and issue a warning
 
--- TODO: detect double/multiple CNAME chain and report warning - somewhere says CNAMEs should not point to CNAMEs.
+-- TODO: detect double/multiple CNAME chain and report warning - somewhere says CNAMEs should not point to CNAMEs. (see RFC 2181 s10.1)
 
 -- TODO: some kind of "progress from root" check that checks that we could have resolved the answer(s) without needing weird caching to already be in place; warning if this is not the case
 
