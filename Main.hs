@@ -400,7 +400,7 @@ cacheResolverAnswer server qname qrrtype r = do
 
         _ -> do
                report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
-               qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: when querying nameserver " ++ (show $ resolvInfo server)))
+               qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: " ++ (show r)))
                empty -- TODO something more interesting here
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
 
