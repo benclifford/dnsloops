@@ -8,8 +8,10 @@ import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (runReaderT, ask, ReaderT ())
 import Data.ByteString.Char8 (pack, unpack)
+import Data.Function (on)
 import Data.IP
 import Data.List (tails, nub, groupBy, sortBy)
+import Data.Maybe (catMaybes, fromJust)
 import Data.Typeable
 
 import Network.DNS
@@ -52,7 +54,7 @@ liftDNSError :: Either DNSError a -> Either ResolverError a
 liftDNSError (Left e) = Left (ResolverDNSError e)
 liftDNSError (Right v) = Right v
 
-data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable)
+data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable, Ord)
 data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 
 instance Qable GetRRSetQuery GetRRSetAnswer where
@@ -101,6 +103,7 @@ main = do
   (flip runReaderT) db $ do
     displayStats
     displayStatsByType
+    displayDuplicateRRSets
 
 -- | TODO: maybe should be log-level aware?
 putIO = liftIO . putStrLn
@@ -139,6 +142,33 @@ displayStatsByType = do
     ++ (show lt)
     ++ ": "
     ++ (show $ length $ filter (== lt) $ resultTypes)
+
+
+
+displayDuplicateRRSets :: StaticStage
+displayDuplicateRRSets = do
+  putIO $ "Queries for which more than one RRSet was found:"
+  db <- ask
+  let pRes = previousResults db
+  let filtered = catMaybes (maybeGetRRSetQuery <$> pRes)
+  putIO $ "There are " ++ (show $ length filtered) ++ " GetRRSetQueries"
+
+  let sortedByQ = sortBy (compare `on` fst) filtered
+  let groupedByQ = groupBy ( (==) `on` fst) sortedByQ
+
+  dumpRRQA groupedByQ
+
+dumpRRQA l = 
+  forM_ l $ \g -> do
+    putIO "--"
+    forM_ g $ \(q,a) -> putIO $ (show q) ++ ": " ++ (show a)
+
+
+maybeGetRRSetQuery :: PreviousResult -> Maybe (GetRRSetQuery, GetRRSetAnswer)
+maybeGetRRSetQuery (PreviousResult q a) | Just q' <- (cast q) = Just (q', fromJust $ cast a)
+maybeGetRRSetQuery _ = Nothing
+
+
 
 typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
