@@ -556,3 +556,5 @@ recordRRlist rs = let
 -- TODO: multicast DNS resolving. also note 13:13  * David-T discovers multicast DNS (rfc6762) uses UTF-8 not punycode
 --  this could probably fit the same interface as using a direct recursive resolver. and perhaps anything nsswitchy eg YP/NIS
 
+-- TODO: for composition of reified queries, which seems awkward without explicitly defining the composition as its own re-ified query data type, is there a category-theory way of doing this, where using >>> category composition causes a re-ified value to come into existence of some "Compose" type without needing to define the reifications explicitly? I look at this for perhaps being able to separate out normalisation of results from performing the query to acquire the results so that the database and analysis can see both?
+
