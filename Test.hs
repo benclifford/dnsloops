@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Test where
 
@@ -98,13 +98,15 @@ main = do
 
   putStrLn "Tests finished without failure"
 
-instance Qable StrLenQuery Int where
+instance Qable StrLenQuery where
+  type Answer StrLenQuery = Int
   runQable q@(StrLenQuery s) = qrecord q (length s)
 
 data StrLenQuery = StrLenQuery String deriving (Show, Eq, Typeable)
 
 
-instance Qable IntegerQuery Int where
+instance Qable IntegerQuery where
+  type Answer IntegerQuery = Int
   runQable q@(Inc n) = qrecord q (n + 1)
   runQable q@(Dec n) = qrecord q (n - 1)
 
@@ -114,7 +116,8 @@ data IntegerQuery = Inc Int | Dec Int deriving (Show, Eq, Typeable)
 data ArbQuery = ArbA | ArbB | ArbC | ArbCounterUnsafeIO deriving (Show, Eq, Typeable)
 data ArbRes = ArbRes String deriving (Show, Eq, Typeable, Ord)
 
-instance Qable ArbQuery ArbRes where
+instance Qable ArbQuery where
+  type Answer ArbQuery = ArbRes
   runQable ArbA = qrecord ArbA (ArbRes "Hi")
   runQable ArbB = qrecord ArbB (ArbRes "Bye") >> qrecord ArbA (ArbRes "Hello") >> qrecord ArbC (ArbRes "test")
   runQable ArbC = return ()

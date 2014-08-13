@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternGuards #-}
 
@@ -36,7 +36,8 @@ data ResolverError =
   | ResolverIOError IOError
   deriving (Show, Eq, Typeable)
 
-instance Qable ResolverQuery ResolverAnswer where
+instance Qable ResolverQuery where
+  type Answer ResolverQuery = ResolverAnswer
   runQable q@(ResolverQuery rc d t) = do
     result <- liftIO $ do
       resolver <- makeResolvSeed rc
@@ -57,7 +58,8 @@ liftDNSError (Right v) = Right v
 data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable, Ord)
 data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 
-instance Qable GetRRSetQuery GetRRSetAnswer where
+instance Qable GetRRSetQuery where
+  type Answer GetRRSetQuery = GetRRSetAnswer
   runQable q@(GetRRSetQuery d ty) =
     (report $  "Launching complex resolve for GetRRSetQuery: " ++ (show d) ++ " " ++ (show ty))
     <|>

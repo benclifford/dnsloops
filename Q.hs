@@ -1,6 +1,6 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -20,9 +20,10 @@ import Data.Typeable
 
 -- * The monad on which everything runs
 
-class (Show q, Show a, Eq q, Eq a, Typeable q, Typeable a)
-  => Qable q a | q -> a where
+class (Show q, Show (Answer q), Eq q, Eq (Answer q), Typeable q, Typeable (Answer q))
+  => Qable q where
 
+  type Answer q
   -- | Run the query. The answer type does not appear in
   -- the type signature because there is nothing magic
   -- about the answer type: running the query might push
@@ -45,9 +46,9 @@ data QInstruction final x where
   -- runs an action in the underlying IO monad
   QT :: IO r -> QInstruction final r
   -- | Asks for a query to be made without waiting for any answers
-  QLaunch :: (Typeable final, Qable q a) => q -> QInstruction final ()
+  QLaunch :: (Typeable final, Qable q) => q -> QInstruction final ()
   -- | Records an answer to a query (which might not have been launched...)
-  QRecord :: (Typeable final, Qable q a) => q -> a -> QInstruction final ()
+  QRecord :: (Typeable final, Qable q) => q -> (Answer q) -> QInstruction final ()
   -- | QPull asks for the responses to a query without launching that
   --   query. Often it should follow a push, I think, but sometimes not -
   --   for example when looking for cached values.
@@ -58,13 +59,13 @@ data QInstruction final x where
   -- that typeable constraint further out into client programs
   -- sometimes in a way that seems superficially unnecessary)
 
-  QPull :: (Typeable final, Qable q a) => q -> QInstruction final a
+  QPull :: (Typeable final, Qable q) => q -> QInstruction final (Answer q)
   QPushFinalResult :: final -> QInstruction final ()
 
 -- * DB bits
 
 data PreviousLaunch where
-  PreviousLaunch :: forall q . forall a . (Qable q a) => q -> PreviousLaunch
+  PreviousLaunch :: forall q . (Qable q) => q -> PreviousLaunch
 
 deriving instance Show PreviousLaunch
 
@@ -73,7 +74,7 @@ instance Eq PreviousLaunch where
     Just l == cast r
 
 data PreviousResult where
-  PreviousResult :: forall q . forall a . (Qable q a) => q -> a -> PreviousResult
+  PreviousResult :: forall q . (Qable q) => q -> (Answer q) -> PreviousResult
 
 instance Show PreviousResult where 
   show (PreviousResult q a) = "Query " ++ (show q) ++ " => " ++ (show a)
@@ -83,7 +84,7 @@ instance Show PreviousResult where
 -- returning a value and discarding it, but using () makes it clearer
 -- in the type system that there cannot be a value.
 data PreviousPull final where
-  PreviousPull :: forall final . forall q . forall a . (Typeable final, Qable q a) => q -> PPQ final a -> PreviousPull final
+  PreviousPull :: forall final . forall q . (Typeable final, Qable q) => q -> PPQ final (Answer q) -> PreviousPull final
 
 -- | this is a wrapper that gives a Typeable instance for a -> Q ()
 -- because using that type on its own wasn't Typeable
@@ -201,7 +202,7 @@ iRunViewedQ i = case i of
 
     return $ concat rs
 
-processNewResult :: (Qable q a) => q -> a -> StateT (DB x) IO ()
+processNewResult :: (Qable q) => q -> (Answer q) -> StateT (DB x) IO ()
 processNewResult q v = do
   -- dumpPreviousResults
   -- TODO: find any existing Pulls that have requested results
@@ -223,7 +224,7 @@ processNewResult q v = do
 
 unQ (Q p) = p
 
-previousResultsForQuery :: (Qable q a) => q -> StateT (DB x) IO [a]
+previousResultsForQuery :: (Qable q) => q -> StateT (DB x) IO [Answer q]
 previousResultsForQuery q  = do
   db <- get
   let fm = for (previousResults db) $ \(PreviousResult q' a') -> 
@@ -234,7 +235,7 @@ previousResultsForQuery q  = do
 
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
 
-previousPullsForQuery :: (Qable q a) => q -> StateT (DB final) IO [PPQ final a]
+previousPullsForQuery :: (Qable q) => q -> StateT (DB final) IO [PPQ final (Answer q)]
 previousPullsForQuery q = do
   db <- get
   let fm = for (previousPulls db) $ \r@(PreviousPull q' a') ->
@@ -257,7 +258,7 @@ dumpPreviousResults = do
       liftIO $ print $ previousResults db
 
 
-qlaunch :: (Typeable final, Qable q a) => q -> Q final a
+qlaunch :: (Typeable final, Qable q) => q -> Q final (Answer q)
 qlaunch q = Q $ (singleton $ QLaunch q) *> empty
 
 qrecord q a = Q $ singleton $ QRecord q a
