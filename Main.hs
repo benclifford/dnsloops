@@ -558,3 +558,5 @@ recordRRlist rs = let
 
 -- TODO: for composition of reified queries, which seems awkward without explicitly defining the composition as its own re-ified query data type, is there a category-theory way of doing this, where using >>> category composition causes a re-ified value to come into existence of some "Compose" type without needing to define the reifications explicitly? I look at this for perhaps being able to separate out normalisation of results from performing the query to acquire the results so that the database and analysis can see both?
 
+-- TODO: when using DNSSEC, check that every single query made was authenticated with DNSSEC, so there is not some obscure path through which a non-DNSSEC attack might be made. The output of this could be reported in the form of a potential attack path of which servers in sequence we need to trick.
+
