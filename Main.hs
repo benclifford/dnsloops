@@ -562,3 +562,4 @@ recordRRlist rs = let
 
 -- TODO: when using DNSSEC, check that every single query made was authenticated with DNSSEC, so there is not some obscure path through which a non-DNSSEC attack might be made. The output of this could be reported in the form of a potential attack path of which servers in sequence we need to trick.
 
+-- TODO: everything coming from a manually specified recursive resolver should be the same RRset as from real, except that the TTL is allowed to be smaller (but not bigger - a bigger one is an error condition, though that may have come from recently reducing the ttls on the master - it is still important to know it is happening). A similar but different subset relationship to glue checking: glue checking is allowed to miss out some records (or at least generate a lesser warning in that situation)
