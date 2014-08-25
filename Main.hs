@@ -27,6 +27,7 @@ import Q
 import Query.GetRRSet
 import Query.Resolver
 import qualified Rules.DuplicateRRs
+import qualified Rules.RefusedQueries
 import qualified Rules.Stats
 import Stages
 import Util
@@ -86,6 +87,7 @@ main = do
     Rules.Stats.displayStats
     Rules.Stats.displayStatsByType
     Rules.DuplicateRRs.displayDuplicateRRSets
+    Rules.RefusedQueries.displayRefusedQueries
 
 
 populateRootHints :: DynamicStage
