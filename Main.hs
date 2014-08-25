@@ -25,21 +25,14 @@ import Lib
 import MainArgs
 import Q
 import Query.GetRRSet
+import Query.Resolver
 import qualified Rules.DuplicateRRs
 import qualified Rules.Stats
 import Stages
 import Util
 import Control.Monad
 
-data ResolverQuery = ResolverQuery ResolvConf Domain TYPE deriving (Show, Eq, Typeable)
-data ResolverAnswer =
-    ResolverAnswer (Either ResolverError DNSFormat)
-  deriving (Show, Eq, Typeable)
-
-data ResolverError =
-    ResolverDNSError DNSError
-  | ResolverIOError IOError
-  deriving (Show, Eq, Typeable)
+-- TODO: Qable instances should move into appropriate query class
 
 instance Qable ResolverQuery where
   type Answer ResolverQuery = ResolverAnswer
