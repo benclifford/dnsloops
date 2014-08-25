@@ -25,6 +25,8 @@ import Lib
 import MainArgs
 import Q
 import Query.GetRRSet
+import qualified Rules.DuplicateRRs
+import qualified Rules.Stats
 import Stages
 import Util
 import Control.Monad
@@ -88,76 +90,10 @@ main = do
   putStrLn "Static stage:"
 
   (flip runReaderT) db $ do
-    displayStats
-    displayStatsByType
-    displayDuplicateRRSets
+    Rules.Stats.displayStats
+    Rules.Stats.displayStatsByType
+    Rules.DuplicateRRs.displayDuplicateRRSets
 
-displayStats :: StaticStage
-displayStats = do
-  db <- ask
-  putIO   "Database statistics:"
-  putIO $ "  Number of previous launches: " ++ (show $ length $ previousLaunches db)
-  putIO $ "  Number of previous results: " ++ (show $ length $ previousResults db)
-  putIO $ "  Number of previous pulls: " ++ (show $ length $ previousPulls db)
-  putIO $ "  Number of final results: " ++ (show $ length $ finalResults db)
-
-displayStatsByType :: StaticStage
-displayStatsByType = do
-  db <- ask
-  let launchTypes = typeOfPreviousLaunch <$> ((previousLaunches db))
-        where typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
-
-  putIO $ "Launch types: " ++ (show $ nub launchTypes)
-  forM_ (nub launchTypes) $ \lt -> putIO $ 
-       "  "
-    ++ (show lt)
-    ++ ": "
-    ++ (show $ length $ filter (== lt) $ launchTypes)
-
-  -- we could get the type of a here, but there is slightly
-  -- more information contained in q because multiple
-  -- q types can share the same a type.
-  let resultTypes = typeOfPreviousResult <$> ((previousResults db))
-        where typeOfPreviousResult (PreviousResult q a) = typeOf q
-
-  putIO $ "Result types: " ++ (show $ nub resultTypes)
-  forM_ (nub resultTypes) $ \lt -> putIO $
-       "  "
-    ++ (show lt)
-    ++ ": "
-    ++ (show $ length $ filter (== lt) $ resultTypes)
-
-
-
-displayDuplicateRRSets :: StaticStage
-displayDuplicateRRSets = do
-  putIO $ "Queries for which more than one RRSet was found:"
-  db <- ask
-  let pRes = previousResults db
-  let filtered = catMaybes (maybeGetRRSetQuery <$> pRes)
-  putIO $ "There are " ++ (show $ length filtered) ++ " GetRRSetQueries"
-
-  let sortedByQ = sortBy (compare `on` fst) filtered
-  let groupedByQ = groupBy ( (==) `on` fst) sortedByQ
-
-  forM_ groupedByQ $ \g -> do
-    let (GetRRSetQuery name typ,_) = head g -- There must be at least one group because this somes from groupBy, and the fst element should be the same for all elements in the group
-    putIO $ (unpack name) ++ "/" ++ (show typ) ++ ":"
-    forM_ g $ \(_,GetRRSetAnswer a) -> case a of
-      Left err -> putIO $ "  Error: " ++ err
-      Right (CRRSet rrset) -> do
-        putIO "  ["
-        forM_ rrset $ \rr -> putIO $ "    " ++ (show rr)
-        putIO "  ]"
-
-
-maybeGetRRSetQuery :: PreviousResult -> Maybe (GetRRSetQuery, GetRRSetAnswer)
-maybeGetRRSetQuery (PreviousResult q a) | Just q' <- (cast q) = Just (q', fromJust $ cast a)
-maybeGetRRSetQuery _ = Nothing
-
-
-
-typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 
 populateRootHints :: DynamicStage
 populateRootHints = 
