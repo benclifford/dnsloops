@@ -18,6 +18,8 @@ import Data.Dynamic
 import Data.Maybe
 import Data.Typeable
 
+import Lib
+
 -- * The monad on which everything runs
 
 class (Show q, Show (Answer q), Eq q, Eq (Answer q), Typeable q, Typeable (Answer q))
@@ -248,8 +250,6 @@ previousPullsForQuery q = do
 -- turned into some query-referenced shared type with a
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
-
-for = flip map
 
 dumpPreviousResults :: StateT (DB x) IO ()
 dumpPreviousResults = do

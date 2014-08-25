@@ -6,4 +6,4 @@ import Control.Monad.IO.Class (liftIO, MonadIO)
 putIO :: MonadIO m => String -> m ()
 putIO = liftIO . putStrLn
 
-
+for = flip map
