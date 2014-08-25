@@ -21,6 +21,7 @@ import System.IO.Error
 
 import Domain
 import Instances
+import Lib
 import MainArgs
 import Q
 import Util
@@ -106,9 +107,6 @@ main = do
     displayStats
     displayStatsByType
     displayDuplicateRRSets
-
--- | TODO: maybe should be log-level aware?
-putIO = liftIO . putStrLn
 
 displayStats :: StaticStage
 displayStats = do
