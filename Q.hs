@@ -229,7 +229,7 @@ unQ (Q p) = p
 previousResultsForQuery :: (Qable q) => q -> StateT (DB x) IO [Answer q]
 previousResultsForQuery q  = do
   db <- get
-  let fm = for (previousResults db) $ \(PreviousResult q' a') -> 
+  let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
        case (cast q') of
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
@@ -240,7 +240,7 @@ previousResultsForQuery q  = do
 previousPullsForQuery :: (Qable q) => q -> StateT (DB final) IO [PPQ final (Answer q)]
 previousPullsForQuery q = do
   db <- get
-  let fm = for (previousPulls db) $ \r@(PreviousPull q' a') ->
+  let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
        case (cast q') of
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
