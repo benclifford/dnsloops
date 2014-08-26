@@ -479,3 +479,8 @@ recordRRlist rs = let
 
 -- TODO: check for refused messages from a server we believe to be authoritative and that should be answering (is that every server we contact? or is there speculative stuff?)
 
+-- TODO BUG: when network is down, I get errors like the below which are fatal to the program rather than being caught and handled as data. Although arguably they should be reported as "local system errors" rather than remote system errors, I think.
+{-
+Launching query ResolverQuery (ResolvConf {resolvInfo = RCHostName "192.5.6.30", resolvTimeout = 3000000, resolvRetry = 3, resolvBufsize = 512}) "B.ROOT-SERVERS.NET." A
+dnsloops: getAddrInfo: does not exist (Address family for hostname not supported)
+-}
