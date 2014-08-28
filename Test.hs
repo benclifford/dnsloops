@@ -17,6 +17,7 @@ import System.IO.Unsafe
   -- give this external counter.
 
 import Q
+import Q.Interpreter
 
 main = do
   putStrLn "dnsloops test"

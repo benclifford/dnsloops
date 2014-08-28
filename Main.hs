@@ -24,6 +24,7 @@ import Instances
 import Lib
 import MainArgs
 import Q
+import Q.Interpreter
 import Query.GetRRSet
 import Query.Resolver
 import qualified Rules.DuplicateRRs
