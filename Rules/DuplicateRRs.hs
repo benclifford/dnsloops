@@ -31,7 +31,7 @@ displayDuplicateRRSets = do
     let (GetRRSetQuery name typ,_) = head g -- There must be at least one group because this somes from groupBy, and the fst element should be the same for all elements in the group
     putIO $ (unpack name) ++ "/" ++ (show typ) ++ ":"
     forM_ g $ \(_,GetRRSetAnswer a) -> case a of
-      Left err -> putIO $ "  Error: " ++ err
+      Left err -> putIO $ "  Non-RRSet response: " ++ err
       Right (CRRSet rrset) -> do
         putIO "  ["
         forM_ rrset $ \rr -> putIO $ "    " ++ (show rr)
