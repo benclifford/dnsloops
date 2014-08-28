@@ -145,8 +145,6 @@ iRunViewedQ i = case i of
     prevs <- previousLaunches <$> get
     -- liftIO $ putStr "Previously launched queries: "
     -- liftIO $ print prevs
-    -- TODO: check if q is an element of prevs,
-    -- using typeable set stuff.
     let newLaunchPL = PreviousLaunch q
     if not (newLaunchPL `elem` prevs) then do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
