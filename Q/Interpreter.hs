@@ -9,10 +9,11 @@
 module Q.Interpreter where
 
 import Control.Applicative
+import Control.Concurrent.STM (atomically, modifyTVar, newTVar, readTVar, TVar() )
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.MonadPlus.Operational
-import Control.Monad.State.Strict
+import Control.Monad.Reader
 
 import Data.Dynamic
 import Data.Maybe
@@ -33,13 +34,15 @@ runQ m = do
   let (Q p) = do
              r <- m
              pushFinalResult r
-  db <- execStateT (iRunQ p) emptyDB
+  dbRef <- atomically (newTVar emptyDB)
+  runReaderT (iRunQ p) dbRef
+  db <- atomically $ readTVar dbRef
   return (finalResults db, db)
 
-iRunQ :: QProgram final x -> StateT (DB final) IO [x]
+iRunQ :: QProgram final x -> ReaderT (TVar (DB final)) IO [x]
 iRunQ m = iRunViewedQ (view m)
 
-iRunViewedQ :: ProgramViewP (QInstruction final) x -> StateT (DB final) IO [x]
+iRunViewedQ :: ProgramViewP (QInstruction final) x -> ReaderT (TVar (DB final)) IO [x]
 iRunViewedQ i = case i of
 
   Return v -> return [v]
@@ -115,7 +118,7 @@ iRunViewedQ i = case i of
 
     return $ concat rs
 
-processNewResult :: (Qable q) => q -> (Answer q) -> StateT (DB x) IO ()
+processNewResult :: (Qable q) => q -> (Answer q) -> ReaderT (TVar (DB x)) IO ()
 processNewResult q v = do
   -- dumpPreviousResults
   -- TODO: find any existing Pulls that have requested results
@@ -137,7 +140,7 @@ processNewResult q v = do
 
 unQ (Q p) = p
 
-previousResultsForQuery :: (Qable q) => q -> StateT (DB x) IO [Answer q]
+previousResultsForQuery :: (Qable q) => q -> ReaderT (TVar (DB x)) IO [Answer q]
 previousResultsForQuery q  = do
   db <- get
   let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
@@ -148,7 +151,7 @@ previousResultsForQuery q  = do
 
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
 
-previousPullsForQuery :: (Qable q) => q -> StateT (DB final) IO [PPQ final (Answer q)]
+previousPullsForQuery :: (Qable q) => q -> ReaderT (TVar (DB final)) IO [PPQ final (Answer q)]
 previousPullsForQuery q = do
   db <- get
   let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
@@ -162,9 +165,35 @@ previousPullsForQuery q = do
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
 
-dumpPreviousResults :: StateT (DB x) IO ()
+dumpPreviousResults :: ReaderT (TVar (DB x)) IO ()
 dumpPreviousResults = do
       liftIO $ putStrLn "Previous results: "
       db <- get
       liftIO $ print $ previousResults db
+
+
+-- | This is like StateT's get but running on top of
+-- the ReaderT TVar stuff. Any uses of it should be
+-- inspected to see if they are being used in a thread-safe
+-- manner. I think it is quite unlikely for get that it
+-- is not, and that it should be combined with
+-- accompanying modify calls into a single atomic
+-- section.
+
+get :: ReaderT (TVar (DB x)) IO (DB x)
+get = do
+  ref <- ask
+  liftIO $ atomically $ readTVar ref
+
+
+-- | This is like StateT's modify but running on top of
+-- the ReadeRT TVar stuff. Any uses of it should be
+-- inspected to see if they are being used in a thread-safe
+-- manner.
+
+-- modify :: MonadState s m => (s -> s) -> m ()
+modify :: ((DB x) -> (DB x)) -> ReaderT (TVar (DB x)) IO ()
+modify f = do
+  ref <- ask
+  liftIO $ atomically $ modifyTVar ref f
 
