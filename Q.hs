@@ -12,7 +12,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.MonadPlus.Operational
-import Control.Monad.State.Strict
 
 import Data.Dynamic
 import Data.Maybe
