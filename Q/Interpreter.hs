@@ -98,11 +98,12 @@ iRunViewedQ i = case i of
       if not (a `elem` rs) then do
        
          modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a] }
-         return True
+         return (Just db)
 
-       else return False
+       else return Nothing
 
-    when doNewResult $ do
+    case doNewResult of
+     Just db -> do
       liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
         -- dumpPreviousResults
         -- TODO: find any existing Pulls that have requested results
@@ -125,8 +126,6 @@ iRunViewedQ i = case i of
       
       cbs <- do
         
-        ref <- ask
-        db <- liftIO $ atomically $ readTVar ref
         let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
              case (cast q') of
                Just q'' | q'' == q -> cast a'
@@ -135,6 +134,7 @@ iRunViewedQ i = case i of
       
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
       mapM_ (\(PPQ f) -> iRunQ (unQ $ f a)) cbs 
+     Nothing -> return ()
 
     iRunQ (k ())
 
