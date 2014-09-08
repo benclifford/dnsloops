@@ -49,7 +49,8 @@ iRunViewedQ i = case i of
 
   (QPushFinalResult v) :>>= k -> do
     liftIO $ putStrLn $ "FINAL"
-    modify $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
+    ref <- ask
+    liftIO $ atomically $ modifyTVar ref $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
     iRunQ (k ())
 
   (QT a) :>>= k -> do
@@ -58,32 +59,53 @@ iRunViewedQ i = case i of
 
   (QLaunch q) :>>= k -> do
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
-    prevs <- previousLaunches <$> get
-    -- liftIO $ putStr "Previously launched queries: "
-    -- liftIO $ print prevs
     let newLaunchPL = PreviousLaunch q
-    if not (newLaunchPL `elem` prevs) then do
+
+    ref <- ask
+
+    -- Atomically add to the launched list, and if it wasn't already there,
+    -- run it
+    toRun <- liftIO $ atomically $ do
+      prevs <- previousLaunches <$> readTVar ref
+      if not (newLaunchPL `elem` prevs) then do
+        modifyTVar ref 
+                 $ \olddb -> olddb { previousLaunches = (previousLaunches olddb) ++ [newLaunchPL] }
+        return True
+       else do
+        return False
+
+    when toRun $ do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
-      modify $ \olddb -> olddb { previousLaunches = (previousLaunches olddb) ++ [newLaunchPL] }
       let (Q p) = runQable q
       iRunQ p
       return ()
-     else do
-      -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Duplicate query submission. Not launching again."
-      return ()
+
     iRunQ (k ())
 
   (QRecord q a) :>>= k -> do
 
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
+    -- For putting in an atomic block this is a little bit sensitive...
+    -- processNewResult modifies the database to add the new result in
+    -- but that needs to happen atomically with the previousResultsForQuery
+
     -- is this new?
-    rs <- previousResultsForQuery q
-    if not (a `elem` rs) then do
+    ref <- ask
+    doNewResult <- liftIO $ atomically $ do
+      db <- readTVar ref
+      let rs = previousResultsForQuery' db q
+      if not (a `elem` rs) then do
        
-       liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
-       processNewResult q a
-     else return () -- TODO: maybe want to log this in debug mode? liftIO $ putStrLn "Duplicate result. Not processing as new result"
+         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a] }
+         return True
+
+       else return False
+
+    when doNewResult $ do
+      liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
+      processNewResult q a
+
     iRunQ (k ())
 
   (QPull q) :>>= k -> do
@@ -101,13 +123,19 @@ iRunViewedQ i = case i of
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
     let callback = PreviousPull q (PPQ (\a -> Q $ k a >> return ()))
 
-    modify $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
+    ref <- ask
 
-    -- run the rest of the program for every result that is
-    -- already known. This may results in the above callback
-    -- being invoked, if relevant pushes happen.
+    rs <- liftIO $ atomically $ do
+      modifyTVar ref $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
+
+      -- run the rest of the program for every result that is
+      -- already known. This may results in the above callback
+      -- being invoked, if relevant pushes happen.
+      db <- readTVar ref
+      return $ previousResultsForQuery' db q
+
     liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
-    rs <- previousResultsForQuery q
+
     rrs <- mapM (\v -> iRunQ (k v)) rs
 
     return $ concat rrs
@@ -129,17 +157,16 @@ processNewResult q v = do
   -- vs when the result is added as a previous result.
   -- TODO: ^ tests to check that subtlety
 
-  modify $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q v] }
 
   cbs <- previousPullsForQuery q
 
   liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
   mapM_ (\(PPQ f) -> iRunQ (unQ $ f v)) cbs 
 
-  -- dumpPreviousResults
 
 unQ (Q p) = p
 
+{-
 previousResultsForQuery :: (Qable q) => q -> ReaderT (TVar (DB x)) IO [Answer q]
 previousResultsForQuery q  = do
   db <- get
@@ -148,12 +175,31 @@ previousResultsForQuery q  = do
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
   return $ catMaybes fm
+-}
 
---  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
+previousResultsForQuery' :: (Qable q) => DB x -> q -> [Answer q]
+previousResultsForQuery' db q  = do
+  let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
+       case (cast q') of
+         Just q'' | q'' == q -> cast a'
+         _ -> Nothing
+   in catMaybes fm
+
+
+-- TODO: THREADING BUG? I am unsure, because I haven't really done
+-- any reasoning about this, if this needs to happen within the
+-- atomic block that calls processNewResult? I think it might need
+-- to... does the "previous pulls" list need to be generated at the
+-- same instant in db-time as the new result is added to the database?
+-- I think yes.
+-- In which case its probably better to get this function and
+-- processNewResult all expanded out in the calling function, and
+-- then potentially refactor afterwards.
 
 previousPullsForQuery :: (Qable q) => q -> ReaderT (TVar (DB final)) IO [PPQ final (Answer q)]
 previousPullsForQuery q = do
-  db <- get
+  ref <- ask
+  db <- liftIO $ atomically $ readTVar ref
   let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
        case (cast q') of
          Just q'' | q'' == q -> cast a'
@@ -168,7 +214,8 @@ previousPullsForQuery q = do
 dumpPreviousResults :: ReaderT (TVar (DB x)) IO ()
 dumpPreviousResults = do
       liftIO $ putStrLn "Previous results: "
-      db <- get
+      ref <- ask
+      db <- liftIO $ atomically $ readTVar ref
       liftIO $ print $ previousResults db
 
 
@@ -179,12 +226,12 @@ dumpPreviousResults = do
 -- is not, and that it should be combined with
 -- accompanying modify calls into a single atomic
 -- section.
-
+{-
 get :: ReaderT (TVar (DB x)) IO (DB x)
 get = do
   ref <- ask
   liftIO $ atomically $ readTVar ref
-
+-}
 
 -- | This is like StateT's modify but running on top of
 -- the ReadeRT TVar stuff. Any uses of it should be
