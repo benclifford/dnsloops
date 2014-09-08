@@ -76,8 +76,8 @@ iRunViewedQ i = case i of
 
     when toRun $ do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
-      let (Q p) = runQable q
-      iRunQ p
+      let p' = unQ $ runQable q
+      iRunQ p'
       return ()
 
     iRunQ (k ())
