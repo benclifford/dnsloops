@@ -104,7 +104,37 @@ iRunViewedQ i = case i of
 
     when doNewResult $ do
       liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
-      processNewResult q a
+        -- dumpPreviousResults
+        -- TODO: find any existing Pulls that have requested results
+        -- from this query.
+      
+        -- There is probably ordering subtlety here about when the
+        -- callback list is acquired, vs when the callbacks are made,
+        -- vs when the result is added as a previous result.
+        -- TODO: ^ tests to check that subtlety
+      
+        -- TODO: THREADING BUG? I am unsure, because I haven't really done
+        -- any reasoning about this, if this needs to happen within the
+        -- atomic block that calls processNewResult? I think it might need
+        -- to... does the "previous pulls" list need to be generated at the
+        -- same instant in db-time as the new result is added to the database?
+        -- I think yes.
+        -- In which case its probably better to get this function and
+        -- processNewResult all expanded out in the calling function, and
+        -- then potentially refactor afterwards.
+      
+      cbs <- do
+        
+        ref <- ask
+        db <- liftIO $ atomically $ readTVar ref
+        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
+             case (cast q') of
+               Just q'' | q'' == q -> cast a'
+               _ -> Nothing
+        return $ catMaybes fm
+      
+      liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
+      mapM_ (\(PPQ f) -> iRunQ (unQ $ f a)) cbs 
 
     iRunQ (k ())
 
@@ -146,24 +176,6 @@ iRunViewedQ i = case i of
 
     return $ concat rs
 
-processNewResult :: (Qable q) => q -> (Answer q) -> ReaderT (TVar (DB x)) IO ()
-processNewResult q v = do
-  -- dumpPreviousResults
-  -- TODO: find any existing Pulls that have requested results
-  -- from this query.
-
-  -- There is probably ordering subtlety here about when the
-  -- callback list is acquired, vs when the callbacks are made,
-  -- vs when the result is added as a previous result.
-  -- TODO: ^ tests to check that subtlety
-
-
-  cbs <- previousPullsForQuery q
-
-  liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
-  mapM_ (\(PPQ f) -> iRunQ (unQ $ f v)) cbs 
-
-
 unQ (Q p) = p
 
 previousResultsForQuery' :: (Qable q) => DB x -> q -> [Answer q]
@@ -173,27 +185,6 @@ previousResultsForQuery' db q  = do
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
    in catMaybes fm
-
-
--- TODO: THREADING BUG? I am unsure, because I haven't really done
--- any reasoning about this, if this needs to happen within the
--- atomic block that calls processNewResult? I think it might need
--- to... does the "previous pulls" list need to be generated at the
--- same instant in db-time as the new result is added to the database?
--- I think yes.
--- In which case its probably better to get this function and
--- processNewResult all expanded out in the calling function, and
--- then potentially refactor afterwards.
-
-previousPullsForQuery :: (Qable q) => q -> ReaderT (TVar (DB final)) IO [PPQ final (Answer q)]
-previousPullsForQuery q = do
-  ref <- ask
-  db <- liftIO $ atomically $ readTVar ref
-  let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
-       case (cast q') of
-         Just q'' | q'' == q -> cast a'
-         _ -> Nothing
-  return $ catMaybes fm
 
 -- TODO: can the PreviousResult and PreviousPull types be
 -- turned into some query-referenced shared type with a
