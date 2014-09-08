@@ -166,17 +166,6 @@ processNewResult q v = do
 
 unQ (Q p) = p
 
-{-
-previousResultsForQuery :: (Qable q) => q -> ReaderT (TVar (DB x)) IO [Answer q]
-previousResultsForQuery q  = do
-  db <- get
-  let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
-       case (cast q') of
-         Just q'' | q'' == q -> cast a'
-         _ -> Nothing
-  return $ catMaybes fm
--}
-
 previousResultsForQuery' :: (Qable q) => DB x -> q -> [Answer q]
 previousResultsForQuery' db q  = do
   let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
@@ -217,30 +206,4 @@ dumpPreviousResults = do
       ref <- ask
       db <- liftIO $ atomically $ readTVar ref
       liftIO $ print $ previousResults db
-
-
--- | This is like StateT's get but running on top of
--- the ReaderT TVar stuff. Any uses of it should be
--- inspected to see if they are being used in a thread-safe
--- manner. I think it is quite unlikely for get that it
--- is not, and that it should be combined with
--- accompanying modify calls into a single atomic
--- section.
-{-
-get :: ReaderT (TVar (DB x)) IO (DB x)
-get = do
-  ref <- ask
-  liftIO $ atomically $ readTVar ref
--}
-
--- | This is like StateT's modify but running on top of
--- the ReadeRT TVar stuff. Any uses of it should be
--- inspected to see if they are being used in a thread-safe
--- manner.
-
--- modify :: MonadState s m => (s -> s) -> m ()
-modify :: ((DB x) -> (DB x)) -> ReaderT (TVar (DB x)) IO ()
-modify f = do
-  ref <- ask
-  liftIO $ atomically $ modifyTVar ref f
 
