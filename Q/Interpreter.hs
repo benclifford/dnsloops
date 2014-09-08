@@ -9,7 +9,8 @@
 module Q.Interpreter where
 
 import Control.Applicative
-import Control.Concurrent.STM (atomically, modifyTVar, newTVar, readTVar, TVar() )
+import Control.Concurrent (forkIO, newEmptyMVar, putMVar, readMVar, MVar())
+import Control.Concurrent.STM (atomically, modifyTVar, newTVar, readTVar, retry, TVar() )
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.MonadPlus.Operational
@@ -21,6 +22,12 @@ import Data.Typeable
 
 import Lib
 import Q
+
+
+data RuntimeContext final = RuntimeContext {
+    _dbRef :: TVar (DB final),
+    _threadRef :: TVar Integer
+  }
 
 -- * The interpreter
 
@@ -35,21 +42,57 @@ runQ m = do
              r <- m
              pushFinalResult r
   dbRef <- atomically (newTVar emptyDB)
-  runReaderT (iRunQ p) dbRef
-  db <- atomically $ readTVar dbRef
+  threadRef <- atomically $ newTVar 0
+  let context = RuntimeContext dbRef threadRef
+  runReaderT (iRunQ p) context
+  -- now we need to wait for every thread
+  -- to be finished and be aware that there
+  -- may be new threads being started as we
+  -- wait for others to finish
+  -- so we have to get the thread list with
+  -- every wait.
+  -- I think once every thread in the list
+  -- has finished, that is the end of it...
+  -- the only thing that can add in a new thread
+  -- is a non-finished thread - either the
+  -- primary thread which is finished by now, or
+  -- a thread that has a non-finished MVar
+
+  -- block until the thread count is 0
+  liftIO $ atomically $ do
+    threadCount <- readTVar (_threadRef context)
+    when (threadCount > 0) retry
+
+  db <- atomically $ readTVar $ _dbRef context
   return (finalResults db, db)
 
-iRunQ :: QProgram final x -> ReaderT (TVar (DB final)) IO [x]
+iRunQ :: QProgram final x -> ReaderT (RuntimeContext final) IO [x]
 iRunQ m = iRunViewedQ (view m)
 
-iRunViewedQ :: ProgramViewP (QInstruction final) x -> ReaderT (TVar (DB final)) IO [x]
+-- | runs a Q in a new thread, rewrapping it in
+-- a ReaderT (so sort of performing a commute of
+-- reader and IO-fork...)
+forkIRunQ :: QProgram final () -> ReaderT (RuntimeContext final) IO ()
+forkIRunQ m = do
+  context <- ask
+  liftIO $ atomically $ modifyTVar (_threadRef context) (+1)
+  -- TODO better to use forkFinally finally rather than forkIO
+  -- so as to catch any exceptions. but it appears my dev ghc base
+  -- is too old
+  liftIO $ forkIO $ do
+    void $ runReaderT (iRunViewedQ (view m)) context
+    liftIO $ atomically $ modifyTVar (_threadRef context) (+(-1))
+
+  return ()
+
+iRunViewedQ :: ProgramViewP (QInstruction final) x -> ReaderT (RuntimeContext final) IO [x]
 iRunViewedQ i = case i of
 
   Return v -> return [v]
 
   (QPushFinalResult v) :>>= k -> do
     liftIO $ putStrLn $ "FINAL"
-    ref <- ask
+    ref <- askDB
     liftIO $ atomically $ modifyTVar ref $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
     iRunQ (k ())
 
@@ -61,7 +104,7 @@ iRunViewedQ i = case i of
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
     let newLaunchPL = PreviousLaunch q
 
-    ref <- ask
+    ref <- askDB
 
     -- Atomically add to the launched list, and if it wasn't already there,
     -- run it
@@ -77,7 +120,7 @@ iRunViewedQ i = case i of
     when toRun $ do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
       let p' = unQ $ runQable q
-      iRunQ p'
+      forkIRunQ p'
       return ()
 
     iRunQ (k ())
@@ -91,7 +134,7 @@ iRunViewedQ i = case i of
     -- but that needs to happen atomically with the previousResultsForQuery
 
     -- is this new?
-    ref <- ask
+    ref <- askDB
     doNewResult <- liftIO $ atomically $ do
       db <- readTVar ref
       let rs = previousResultsForQuery' db q
@@ -153,7 +196,7 @@ iRunViewedQ i = case i of
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
     let callback = PreviousPull q (PPQ (\a -> Q $ k a >> return ()))
 
-    ref <- ask
+    ref <- askDB
 
     rs <- liftIO $ atomically $ do
       modifyTVar ref $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
@@ -191,10 +234,13 @@ previousResultsForQuery' db q  = do
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
 
-dumpPreviousResults :: ReaderT (TVar (DB x)) IO ()
+dumpPreviousResults :: ReaderT (RuntimeContext x) IO ()
 dumpPreviousResults = do
       liftIO $ putStrLn "Previous results: "
-      ref <- ask
+      ref <- askDB
       db <- liftIO $ atomically $ readTVar ref
       liftIO $ print $ previousResults db
+
+askDB :: ReaderT (RuntimeContext x) IO (TVar (DB x))
+askDB = _dbRef <$> ask
 
