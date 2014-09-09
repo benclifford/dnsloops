@@ -137,7 +137,7 @@ iRunViewedQ i = case i of
     ref <- askDB
     doNewResult <- liftIO $ atomically $ do
       db <- readTVar ref
-      let rs = previousResultsForQuery' db q
+      let rs = previousResultsForQuery db q
       if not (a `elem` rs) then do
        
          modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a] }
@@ -205,7 +205,7 @@ iRunViewedQ i = case i of
       -- already known. This may results in the above callback
       -- being invoked, if relevant pushes happen.
       db <- readTVar ref
-      return $ previousResultsForQuery' db q
+      return $ previousResultsForQuery db q
 
     liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
 
@@ -221,8 +221,8 @@ iRunViewedQ i = case i of
 
 unQ (Q p) = p
 
-previousResultsForQuery' :: (Qable q) => DB x -> q -> [Answer q]
-previousResultsForQuery' db q  = do
+previousResultsForQuery :: (Qable q) => DB x -> q -> [Answer q]
+previousResultsForQuery db q  = do
   let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
        case (cast q') of
          Just q'' | q'' == q -> cast a'
