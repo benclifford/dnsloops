@@ -88,19 +88,19 @@ forkIRunQ m = do
 iRunViewedQ :: ProgramViewP (QInstruction final) x -> ReaderT (RuntimeContext final) IO [x]
 iRunViewedQ i = case i of
 
-  Return v -> return [v]
+  Return v -> {-# SCC case_return #-} return [v]
 
-  (QPushFinalResult v) :>>= k -> do
+  (QPushFinalResult v) :>>= k ->  {-# SCC case_final #-} do
     liftIO $ putStrLn $ "FINAL"
     ref <- askDB
     liftIO $ atomically $ modifyTVar ref $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
     iRunQ (k ())
 
-  (QT a) :>>= k -> do
+  (QT a) :>>= k ->  {-# SCC case_T #-} do
     v <- lift $ a
     iRunQ (k v)
 
-  (QLaunch q) :>>= k -> do
+  (QLaunch q) :>>= k ->  {-# SCC case_launch #-} do
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
     let newLaunchPL = PreviousLaunch q
 
@@ -125,7 +125,7 @@ iRunViewedQ i = case i of
 
     iRunQ (k ())
 
-  (QRecord q a) :>>= k -> do
+  (QRecord q a) :>>= k ->  {-# SCC case_record #-} do
 
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
@@ -181,7 +181,7 @@ iRunViewedQ i = case i of
 
     iRunQ (k ())
 
-  (QPull q) :>>= k -> do
+  (QPull q) :>>= k ->  {-# SCC case_pull #-} do
     liftIO $ putStrLn $ "PULL: " ++ (show q)
     -- dumpPreviousResults
 
@@ -214,7 +214,7 @@ iRunViewedQ i = case i of
     return $ concat rrs
 
   -- | mplus should follow the left distribution law
-  MPlus l -> do
+  MPlus l ->  {-# SCC case_mplus #-} do
     rs <- mapM iRunViewedQ l
 
     return $ concat rs

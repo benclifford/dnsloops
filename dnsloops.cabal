@@ -14,7 +14,7 @@ Executable dnsloops-test
 Executable dnsloops
   Build-depends: base, dns >=1.4, free-operational, mtl, bytestring, iproute, transformers, stm
   main-is: Main.hs
-  ghc-options: -main-is Main -threaded
+  ghc-options: -main-is Main -threaded -rtsopts -fprof-auto
 
 Test-suite test-dnsloops
   Type: exitcode-stdio-1.0
