@@ -75,7 +75,7 @@ main = do
 
   putStrLn "Dynamic stage:"
 
-  (res, db) <- runQ $
+  (res, db) <- {-# SCC dynamicStage #-} runQ $
         populateRootHints
     <|> (query $ GetRRSetQuery hostname ty)
 
@@ -84,11 +84,11 @@ main = do
 
   putStrLn "Static stage:"
 
-  (flip runReaderT) db $ do
-    Rules.Stats.displayStats
-    Rules.Stats.displayStatsByType
-    Rules.DuplicateRRs.displayDuplicateRRSets
-    Rules.RefusedQueries.displayRefusedQueries
+  {-# SCC staticStage #-} (flip runReaderT) db $ do
+      Rules.Stats.displayStats
+      Rules.Stats.displayStatsByType
+      Rules.DuplicateRRs.displayDuplicateRRSets
+      Rules.RefusedQueries.displayRefusedQueries
 
 
 populateRootHints :: DynamicStage
