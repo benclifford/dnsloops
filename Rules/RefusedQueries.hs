@@ -38,10 +38,8 @@ displayRefusedQueries = do
   db <- ask
   let rqs = catMaybes $ maybeResolverQuery <$> (previousResults db)
   
-  putIO $ "There are " ++ (show $ length rqs) ++ " resolver queries"
-
   let refuseds = filter isRefused rqs
-  putIO $ "There are " ++ (show $ length refuseds) ++ " refused resolver queries"
+  putIO $ "There are " ++ (show $ length refuseds) ++ " refused queries out of " ++ (show $ length rqs) ++ " resolver queries."
 
   dumpRefuseds refuseds
 
