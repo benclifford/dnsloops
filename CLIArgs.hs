@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module MainArgs where
+module CLIArgs where
 
 import Control.Monad.State.Lazy
 import System.Console.GetOpt

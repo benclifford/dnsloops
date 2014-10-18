@@ -22,7 +22,6 @@ import System.IO.Error
 import Domain
 import Instances
 import Lib
-import MainArgs
 import Q
 import Q.Interpreter
 import Query.GetRRSet
@@ -65,31 +64,6 @@ instance Qable GetRRSetQuery where
     -- I'm unclear in general about when returning a () vs
     -- returning empty makes sense.
     -- TODO: what to do with the results?
-
-main = do
-  putStrLn "DNSLoops main"
-
-  (h, ty) <- getOptions
-
-  let hostname = ensureDot $ pack h
-
-  putStrLn "Dynamic stage:"
-
-  (res, db) <- {-# SCC dynamicStage #-} runQ $
-        populateRootHints
-    <|> (query $ GetRRSetQuery hostname ty)
-
-  putStrLn "Result of main query: "
-  print `mapM` res
-
-  putStrLn "Static stage:"
-
-  {-# SCC staticStage #-} (flip runReaderT) db $ do
-      Rules.Stats.displayStats
-      Rules.Stats.displayStatsByType
-      Rules.DuplicateRRs.displayDuplicateRRSets
-      Rules.RefusedQueries.displayRefusedQueries
-
 
 populateRootHints :: DynamicStage
 populateRootHints = 
