@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternGuards #-}
 
-module CLIMain where
+module CLI.Main where
 
 import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
@@ -19,7 +19,7 @@ import Network.DNS
 import System.Environment (getArgs)
 import System.IO.Error
 
-import CLIArgs
+import CLI.Args
 import Domain
 import Instances
 import Lib
