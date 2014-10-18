@@ -244,3 +244,5 @@ dumpPreviousResults = do
 askDB :: ReaderT (RuntimeContext x) IO (TVar (DB x))
 askDB = _dbRef <$> ask
 
+-- TODO: single threaded provenance logging output so that multi-line output does not interleave
+
