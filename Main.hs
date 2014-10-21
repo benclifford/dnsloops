@@ -459,3 +459,7 @@ recordRRlist rs = let
 Launching query ResolverQuery (ResolvConf {resolvInfo = RCHostName "192.5.6.30", resolvTimeout = 3000000, resolvRetry = 3, resolvBufsize = 512}) "B.ROOT-SERVERS.NET." A
 dnsloops: getAddrInfo: does not exist (Address family for hostname not supported)
 -}
+
+-- TODO: nameservers not in zone with glue - this requires extra lookup and increases attack surface. low pri warning for this. djb reference for this I think?
+
+
