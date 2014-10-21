@@ -462,4 +462,9 @@ dnsloops: getAddrInfo: does not exist (Address family for hostname not supported
 
 -- TODO: nameservers not in zone with glue - this requires extra lookup and increases attack surface. low pri warning for this. djb reference for this I think?
 
+-- TODO: check authoritatitive nameservers refuse recursion. this is a low-pri warning.
+
+-- TODO: check nameservers do not return a root delegation (unless they are root servers themselves?) -- DDOS amplifier. low-pri warning.
+
+-- TODO: reverse DNS on MX records
 
