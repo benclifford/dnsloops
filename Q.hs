@@ -78,6 +78,7 @@ data PreviousResult where
   PreviousResult :: forall q . (Qable q) => q -> (Answer q) -> ResultId -> PreviousResult
 
 type ResultId = Integer
+data ResultContext = ResultContext [String]
 
 instance Show PreviousResult where 
   show (PreviousResult q a i) = "Query " ++ (show q) ++ " => " ++ (show a) ++ " [RESULT ID " ++ (show i) ++"]"
@@ -97,14 +98,16 @@ data DB final = DB {
     previousLaunches :: [PreviousLaunch],
     previousResults :: [PreviousResult],
     previousPulls :: [PreviousPull final],
-    finalResults :: [final]
+    finalResults :: [final],
+    resultContexts :: [(ResultId, ResultContext)]
   }
 
 emptyDB = DB {
     previousLaunches = [],
     previousResults = [],
     previousPulls = [],
-    finalResults = []
+    finalResults = [],
+    resultContexts = []
   }
 
 qlaunch :: (Typeable final, Qable q) => q -> Q final (Answer q)

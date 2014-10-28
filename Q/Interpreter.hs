@@ -24,13 +24,31 @@ import Lib
 import Q
 
 -- | The monad stack which the interpreter is written in.
-type InterpreterAction final = ReaderT (RuntimeContext final) IO
+-- 
+--   There is a runtime context that consists of TVars
+--   that contain global variables shared by every execution.
+--
+--   Each interpreter action should also take place in a
+--   local context that needs to be formed differently for
+--   each step in the program.
 
-data RuntimeContext final = RuntimeContext {
+
+type InterpreterAction final = ReaderT (GlobalContext final) (ReaderT LocalContext IO)
+
+data GlobalContext final = GlobalContext {
     _dbRef :: TVar (DB final),
     _threadRef :: TVar Integer,
     _resultIdRef :: TVar Integer
   }
+
+-- | Local context for an instruction, forming
+--   something like a stack trace that will then
+--   be attached to each result.
+--   Eventually might want to record multiple
+--   contexts for a result, but for now, only one
+--   (probably the first encountered in realtime)
+--   will be recorded.
+type LocalContext = ResultContext
 
 -- * The interpreter
 
@@ -45,21 +63,25 @@ runQ m = do
   dbRef <- atomically (newTVar emptyDB)
   threadRef <- atomically $ newTVar 0
   ridRef <- atomically $ newTVar 10000
-  let context = RuntimeContext dbRef threadRef ridRef
+  let globalContext = GlobalContext
+        { _dbRef = dbRef
+        , _threadRef = threadRef
+        , _resultIdRef = ridRef
+        }
 
   let (Q p) = do
              r <- m
              pushFinalResult r
 
-  runReaderT (iRunQ p) context
+  runReaderT (runReaderT (iRunQ p) globalContext) (ResultContext [])
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
   liftIO $ atomically $ do
-    threadCount <- readTVar (_threadRef context)
+    threadCount <- readTVar (_threadRef globalContext)
     when (threadCount > 0) retry
 
-  db <- atomically $ readTVar $ _dbRef context
+  db <- atomically $ readTVar $ _dbRef globalContext
   return (finalResults db, db)
 
 iRunQ :: QProgram final x -> InterpreterAction final [x]
@@ -70,14 +92,14 @@ iRunQ m = iRunViewedQ (view m)
 -- reader and IO-fork...)
 forkIRunQ :: QProgram final () -> InterpreterAction final ()
 forkIRunQ m = do
-  context <- ask
-  liftIO $ atomically $ modifyTVar (_threadRef context) (+1)
+  globalContext <- ask
+  liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+1)
   -- TODO better to use forkFinally finally rather than forkIO
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
   liftIO $ forkIO $ do
-    void $ runReaderT (iRunViewedQ (view m)) context
-    liftIO $ atomically $ modifyTVar (_threadRef context) (+(-1))
+    void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext [])
+    liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
   return ()
 
@@ -132,12 +154,16 @@ iRunViewedQ i = case i of
     -- is this new?
     ref <- askDB
     rid <- nextResultId
+    localContext <- askLocalContext
     doNewResult <- liftIO $ atomically $ do
       db <- readTVar ref
       let rs = previousResultsForQuery db q
       if not (a `elem` rs) then do
          let newResult = PreviousResult q a rid
-         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [newResult] }
+         modifyTVar ref $ \olddb -> olddb
+           { previousResults = (previousResults olddb) ++ [newResult]
+           , resultContexts = (resultContexts olddb) ++ [(rid, localContext)]
+           }
          return (Just db)
 
        else return Nothing
@@ -230,6 +256,9 @@ previousResultsForQuery db q  = do
 
 askDB :: InterpreterAction x (TVar (DB x))
 askDB = _dbRef <$> ask
+
+askLocalContext :: InterpreterAction x LocalContext
+askLocalContext = lift ask
 
 nextResultId :: InterpreterAction x Integer
 nextResultId = do
