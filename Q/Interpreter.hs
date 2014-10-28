@@ -23,6 +23,8 @@ import Data.Typeable
 import Lib
 import Q
 
+-- | The monad stack which the interpreter is written in.
+type InterpreterAction final = ReaderT (RuntimeContext final) IO
 
 data RuntimeContext final = RuntimeContext {
     _dbRef :: TVar (DB final),
@@ -68,13 +70,13 @@ runQ m = do
   db <- atomically $ readTVar $ _dbRef context
   return (finalResults db, db)
 
-iRunQ :: QProgram final x -> ReaderT (RuntimeContext final) IO [x]
+iRunQ :: QProgram final x -> InterpreterAction final [x]
 iRunQ m = iRunViewedQ (view m)
 
 -- | runs a Q in a new thread, rewrapping it in
 -- a ReaderT (so sort of performing a commute of
 -- reader and IO-fork...)
-forkIRunQ :: QProgram final () -> ReaderT (RuntimeContext final) IO ()
+forkIRunQ :: QProgram final () -> InterpreterAction final ()
 forkIRunQ m = do
   context <- ask
   liftIO $ atomically $ modifyTVar (_threadRef context) (+1)
@@ -87,7 +89,7 @@ forkIRunQ m = do
 
   return ()
 
-iRunViewedQ :: ProgramViewP (QInstruction final) x -> ReaderT (RuntimeContext final) IO [x]
+iRunViewedQ :: ProgramViewP (QInstruction final) x -> InterpreterAction final [x]
 iRunViewedQ i = case i of
 
   Return v -> {-# SCC case_return #-} return [v]
@@ -236,17 +238,17 @@ previousResultsForQuery db q  = do
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
 
-dumpPreviousResults :: ReaderT (RuntimeContext x) IO ()
+dumpPreviousResults :: InterpreterAction x ()
 dumpPreviousResults = do
       liftIO $ putStrLn "Previous results: "
       ref <- askDB
       db <- liftIO $ atomically $ readTVar ref
       liftIO $ print $ previousResults db
 
-askDB :: ReaderT (RuntimeContext x) IO (TVar (DB x))
+askDB :: InterpreterAction x (TVar (DB x))
 askDB = _dbRef <$> ask
 
-nextResultId :: ReaderT (RuntimeContext x) IO Integer
+nextResultId :: InterpreterAction x Integer
 nextResultId = do
   tvar <- _resultIdRef <$> ask
   liftIO $ atomically $ do
