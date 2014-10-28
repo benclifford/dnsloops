@@ -144,7 +144,6 @@ iRunViewedQ i = case i of
     case doNewResult of
      Just db -> do
       liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
-        -- dumpPreviousResults
         -- TODO: find any existing Pulls that have requested results
         -- from this query.
       
@@ -179,8 +178,6 @@ iRunViewedQ i = case i of
 
   (QPull q) :>>= k ->  {-# SCC case_pull #-} do
     liftIO $ putStrLn $ "PULL: " ++ (show q)
-    -- dumpPreviousResults
-
 
     -- TODO: register some kind of continuation of k to be run when
     -- new results are encountered
@@ -229,13 +226,6 @@ previousResultsForQuery db q  = do
 -- turned into some query-referenced shared type with a
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
-
-dumpPreviousResults :: InterpreterAction x ()
-dumpPreviousResults = do
-      liftIO $ putStrLn "Previous results: "
-      ref <- askDB
-      db <- liftIO $ atomically $ readTVar ref
-      liftIO $ print $ previousResults db
 
 askDB :: InterpreterAction x (TVar (DB x))
 askDB = _dbRef <$> ask
