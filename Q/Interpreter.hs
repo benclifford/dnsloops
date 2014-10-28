@@ -136,7 +136,8 @@ iRunViewedQ i = case i of
       db <- readTVar ref
       let rs = previousResultsForQuery db q
       if not (a `elem` rs) then do
-         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a rid] }
+         let newResult = PreviousResult q a rid
+         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [newResult] }
          return (Just db)
 
        else return Nothing
