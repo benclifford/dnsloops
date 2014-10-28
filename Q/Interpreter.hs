@@ -22,6 +22,7 @@ import Data.Typeable
 
 import Lib
 import Q
+import Q.DB
 
 -- | The monad stack which the interpreter is written in.
 -- 
@@ -240,14 +241,6 @@ iRunViewedQ i = case i of
     return $ concat rs
 
 unQ (Q p) = p
-
-previousResultsForQuery :: (Qable q) => DB x -> q -> [Answer q]
-previousResultsForQuery db q  = do
-  let fm = mapfor (previousResults db) $ \(PreviousResult q' a' _) -> 
-       case (cast q') of
-         Just q'' | q'' == q -> cast a'
-         _ -> Nothing
-   in catMaybes fm
 
 -- TODO: can the PreviousResult and PreviousPull types be
 -- turned into some query-referenced shared type with a

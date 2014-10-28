@@ -78,7 +78,7 @@ data PreviousResult where
   PreviousResult :: forall q . (Qable q) => q -> (Answer q) -> ResultId -> PreviousResult
 
 type ResultId = Integer
-data ResultContext = ResultContext [String]
+data ResultContext = ResultContext [String] deriving Show
 
 instance Show PreviousResult where 
   show (PreviousResult q a i) = "Query " ++ (show q) ++ " => " ++ (show a) ++ " [RESULT ID " ++ (show i) ++"]"
