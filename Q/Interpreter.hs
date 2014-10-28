@@ -41,13 +41,15 @@ evalQ m = do
 
 runQ  :: Q final final -> IO ([final], DB final)
 runQ m = do
-  let (Q p) = do
-             r <- m
-             pushFinalResult r
+
   dbRef <- atomically (newTVar emptyDB)
   threadRef <- atomically $ newTVar 0
   ridRef <- atomically $ newTVar 10000
   let context = RuntimeContext dbRef threadRef ridRef
+
+  let (Q p) = do
+             r <- m
+             pushFinalResult r
 
   runReaderT (iRunQ p) context
 
