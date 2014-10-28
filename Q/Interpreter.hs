@@ -172,7 +172,7 @@ iRunViewedQ i = case i of
         return $ catMaybes fm
       
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
-      mapM_ (\(PPQ f) -> iRunQ (unQ $ f a)) cbs 
+      mapM_ (\(PreviousPullContinuation f) -> iRunQ (unQ $ f a)) cbs 
      Nothing -> return ()
 
     iRunQ (k ())
@@ -188,7 +188,7 @@ iRunViewedQ i = case i of
     -- TODO: make a test case to exercise this subtlety
 
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
-    let callback = PreviousPull q (PPQ (\a -> Q $ k a >> return ()))
+    let callback = PreviousPull q (PreviousPullContinuation (\a -> Q $ k a >> return ()))
 
     ref <- askDB
 

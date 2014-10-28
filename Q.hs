@@ -87,11 +87,11 @@ instance Show PreviousResult where
 -- returning a value and discarding it, but using () makes it clearer
 -- in the type system that there cannot be a value.
 data PreviousPull final where
-  PreviousPull :: forall final . forall q . (Typeable final, Qable q) => q -> PPQ final (Answer q) -> PreviousPull final
+  PreviousPull :: forall final . forall q . (Typeable final, Qable q) => q -> PreviousPullContinuation final (Answer q) -> PreviousPull final
 
 -- | this is a wrapper that gives a Typeable instance for a -> Q ()
 -- because using that type on its own wasn't Typeable
-data PPQ final a = PPQ (a -> Q final ()) deriving Typeable
+data PreviousPullContinuation final a = PreviousPullContinuation (a -> Q final ()) deriving Typeable
 
 data DB final = DB {
     previousLaunches :: [PreviousLaunch],
