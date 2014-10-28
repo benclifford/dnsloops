@@ -73,6 +73,6 @@ dumpRefuseds l = for l $ \(q,a) -> do
   putIO $ "  "
 
 maybeResolverQuery :: PreviousResult -> Maybe (ResolverQuery, ResolverAnswer)
-maybeResolverQuery (PreviousResult q a) | Just q' <- (cast q) = Just (q', fromJust $ cast a)
+maybeResolverQuery (PreviousResult q a _) | Just q' <- (cast q) = Just (q', fromJust $ cast a)
 maybeResolverQuery _ = Nothing
 

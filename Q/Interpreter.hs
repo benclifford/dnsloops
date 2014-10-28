@@ -26,7 +26,8 @@ import Q
 
 data RuntimeContext final = RuntimeContext {
     _dbRef :: TVar (DB final),
-    _threadRef :: TVar Integer
+    _threadRef :: TVar Integer,
+    _resultIdRef :: TVar Integer
   }
 
 -- * The interpreter
@@ -43,7 +44,8 @@ runQ m = do
              pushFinalResult r
   dbRef <- atomically (newTVar emptyDB)
   threadRef <- atomically $ newTVar 0
-  let context = RuntimeContext dbRef threadRef
+  ridRef <- atomically $ newTVar 10000
+  let context = RuntimeContext dbRef threadRef ridRef
   runReaderT (iRunQ p) context
   -- now we need to wait for every thread
   -- to be finished and be aware that there
@@ -135,12 +137,12 @@ iRunViewedQ i = case i of
 
     -- is this new?
     ref <- askDB
+    rid <- nextResultId
     doNewResult <- liftIO $ atomically $ do
       db <- readTVar ref
       let rs = previousResultsForQuery db q
       if not (a `elem` rs) then do
-       
-         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a] }
+         modifyTVar ref $ \olddb -> olddb { previousResults = (previousResults olddb) ++ [PreviousResult q a rid] }
          return (Just db)
 
        else return Nothing
@@ -223,7 +225,7 @@ unQ (Q p) = p
 
 previousResultsForQuery :: (Qable q) => DB x -> q -> [Answer q]
 previousResultsForQuery db q  = do
-  let fm = mapfor (previousResults db) $ \(PreviousResult q' a') -> 
+  let fm = mapfor (previousResults db) $ \(PreviousResult q' a' _) -> 
        case (cast q') of
          Just q'' | q'' == q -> cast a'
          _ -> Nothing
@@ -244,5 +246,12 @@ dumpPreviousResults = do
 askDB :: ReaderT (RuntimeContext x) IO (TVar (DB x))
 askDB = _dbRef <$> ask
 
--- TODO: single threaded provenance logging output so that multi-line output does not interleave
+nextResultId :: ReaderT (RuntimeContext x) IO Integer
+nextResultId = do
+  tvar <- _resultIdRef <$> ask
+  liftIO $ atomically $ do
+    n <- readTVar tvar
+    modifyTVar tvar (+1)
+    return n
 
+-- TODO: single threaded provenance logging output so that multi-line output does not interleave

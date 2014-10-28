@@ -75,10 +75,12 @@ instance Eq PreviousLaunch where
     Just l == cast r
 
 data PreviousResult where
-  PreviousResult :: forall q . (Qable q) => q -> (Answer q) -> PreviousResult
+  PreviousResult :: forall q . (Qable q) => q -> (Answer q) -> ResultId -> PreviousResult
+
+type ResultId = Integer
 
 instance Show PreviousResult where 
-  show (PreviousResult q a) = "Query " ++ (show q) ++ " => " ++ (show a)
+  show (PreviousResult q a i) = "Query " ++ (show q) ++ " => " ++ (show a) ++ " [RESULT ID " ++ (show i) ++"]"
 
 -- | a previous pull request. We can restart but only a computation that
 -- eventually ends with no useful value returned. Potentially we could be
