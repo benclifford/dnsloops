@@ -48,21 +48,11 @@ runQ m = do
   threadRef <- atomically $ newTVar 0
   ridRef <- atomically $ newTVar 10000
   let context = RuntimeContext dbRef threadRef ridRef
-  runReaderT (iRunQ p) context
-  -- now we need to wait for every thread
-  -- to be finished and be aware that there
-  -- may be new threads being started as we
-  -- wait for others to finish
-  -- so we have to get the thread list with
-  -- every wait.
-  -- I think once every thread in the list
-  -- has finished, that is the end of it...
-  -- the only thing that can add in a new thread
-  -- is a non-finished thread - either the
-  -- primary thread which is finished by now, or
-  -- a thread that has a non-finished MVar
 
-  -- block until the thread count is 0
+  runReaderT (iRunQ p) context
+
+  -- block until the thread count is 0, so no more
+  -- activity can happen.
   liftIO $ atomically $ do
     threadCount <- readTVar (_threadRef context)
     when (threadCount > 0) retry
