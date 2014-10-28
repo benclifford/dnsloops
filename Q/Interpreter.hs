@@ -93,7 +93,7 @@ iRunViewedQ i = case i of
     iRunQ (k ())
 
   (QT a) :>>= k ->  {-# SCC case_T #-} do
-    v <- lift $ a
+    v <- liftIO a
     iRunQ (k v)
 
   (QLaunch q) :>>= k ->  {-# SCC case_launch #-} do
