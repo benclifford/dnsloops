@@ -38,6 +38,7 @@ import Control.Monad
 instance Qable ResolverQuery where
   type Answer ResolverQuery = ResolverAnswer
   runQable q@(ResolverQuery rc d t) = do
+    qcontext $ "Resolver query: " ++ (show q)
     result <- liftIO $ do
       resolver <- makeResolvSeed rc
       tryIOError $ withResolver resolver $ \r -> lookupRaw r d t

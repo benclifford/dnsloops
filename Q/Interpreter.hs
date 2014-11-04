@@ -74,7 +74,7 @@ runQ m = do
              r <- m
              pushFinalResult r
 
-  runReaderT (runReaderT (iRunQ p) globalContext) (ResultContext [])
+  runReaderT (runReaderT (iRunQ p) globalContext) (ResultContext ["runQ"])
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
@@ -99,7 +99,7 @@ forkIRunQ m = do
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
   liftIO $ forkIO $ do
-    void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext [])
+    void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext ["forkedIRunQ"])
     liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
   return ()
@@ -239,6 +239,23 @@ iRunViewedQ i = case i of
     rs <- mapM iRunViewedQ l
 
     return $ concat rs
+
+  (QContext ctx) :>>= k -> {-# SCC case_context #-} do
+    liftIO $ putStrLn $ "Adding context " ++ ctx
+    prefixLocalContext ctx $ iRunQ (k ())
+
+
+prefixLocalContext ctx a = replaceLocalContext
+  (\(ResultContext ctxs) -> ResultContext (ctx:ctxs))
+  a
+
+-- | this might be easier to implement if the localcontext was
+--   the outer ReaderT or if both global and local shared a
+--   single ReaderT
+replaceLocalContext :: (LocalContext -> LocalContext) -> InterpreterAction final a -> InterpreterAction final a
+replaceLocalContext f a = do
+  globalContext <- ask
+  lift $ local f $ runReaderT a globalContext
 
 unQ (Q p) = p
 

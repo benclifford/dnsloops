@@ -63,6 +63,9 @@ data QInstruction final x where
   QPull :: (Typeable final, Qable q) => q -> QInstruction final (Answer q)
   QPushFinalResult :: final -> QInstruction final ()
 
+  -- | QContext adds to the context stack for results
+  QContext :: String -> QInstruction final ()
+
 -- * DB bits
 
 data PreviousLaunch where
@@ -116,6 +119,8 @@ qlaunch q = Q $ (singleton $ QLaunch q) *> empty
 qrecord q a = Q $ singleton $ QRecord q a
 
 qpull q = Q $ singleton $ QPull q
+
+qcontext ctx = Q $ singleton $ QContext ctx
 
 query q = qlaunch q <|> qpull q
 
