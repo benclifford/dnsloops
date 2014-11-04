@@ -75,7 +75,7 @@ runQ m = do
              r <- m
              pushFinalResult r
 
-  runReaderT (runReaderT (iRunQ p) (ResultContext ["root run"])) globalContext
+  runReaderT (runReaderT (runQProgram p) (ResultContext ["root run"])) globalContext
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
@@ -86,14 +86,14 @@ runQ m = do
   db <- atomically $ readTVar $ _dbRef globalContext
   return (finalResults db, db)
 
-iRunQ :: QProgram final x -> InterpreterAction final [x]
-iRunQ m = iRunViewedQ (view m)
+runQProgram :: QProgram final x -> InterpreterAction final [x]
+runQProgram m = iRunViewedQ (view m)
 
 -- | runs a Q in a new thread, rewrapping it in
 -- a ReaderT (so sort of performing a commute of
 -- reader and IO-fork...)
-forkIRunQ :: QProgram final () -> InterpreterAction final ()
-forkIRunQ m = do
+forkQProgram :: QProgram final () -> InterpreterAction final ()
+forkQProgram m = do
   globalContext <- askGlobalContext
   localContext <- askLocalContext
   liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+1)
@@ -101,7 +101,7 @@ forkIRunQ m = do
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
   liftIO $ forkIO $ do
-    void $ runReaderT (runReaderT (iRunQ m) localContext) globalContext
+    void $ runReaderT (runReaderT (runQProgram m) localContext) globalContext
     liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
   return ()
@@ -115,11 +115,11 @@ iRunViewedQ i = case i of
     liftIO $ putStrLn $ "FINAL"
     ref <- askDB
     liftIO $ atomically $ modifyTVar ref $ \olddb -> olddb { finalResults = finalResults olddb ++ [v] }
-    iRunQ (k ())
+    runQProgram (k ())
 
   (QT a) :>>= k ->  {-# SCC case_T #-} do
     v <- liftIO a
-    iRunQ (k v)
+    runQProgram (k v)
 
   (QLaunch q) :>>= k ->  {-# SCC case_launch #-} do
 
@@ -147,10 +147,10 @@ iRunViewedQ i = case i of
     when toRun $ do
       liftIO $ putStrLn $ "Launching query " ++ (show q)
       let p' = unQ $ runQable q
-      forkIRunQ p'
+      forkQProgram p'
       return ()
 
-    iRunQ (k ())
+    runQProgram (k ())
 
   (QRecord q a) :>>= k ->  {-# SCC case_record #-} do
 
@@ -214,11 +214,11 @@ iRunViewedQ i = case i of
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
       prefixLocalContext
         ("For query " ++ (show q) ++ " pulling answer " ++ (show a) ++ " (path A)")
-       $ mapM_ (\(ctx, PreviousPullContinuation f) -> concatLocalContext ctx $ iRunQ (unQ $ f a)) cbs 
+       $ mapM_ (\(ctx, PreviousPullContinuation f) -> concatLocalContext ctx $ runQProgram (unQ $ f a)) cbs 
 -- TODO: XXX - use ctx context to augment current context somehow (we want access to both contexts - do I just append them or can there be more interesting tree-like description?
      Nothing -> return ()
 
-    iRunQ (k ())
+    runQProgram (k ())
 
   (QPull q) :>>= k ->  {-# SCC case_pull #-} do
 
@@ -256,7 +256,7 @@ iRunViewedQ i = case i of
       liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
 
       rrs <- mapM
-        (\v -> prefixLocalContext ("For query " ++ (show q) ++ " pulling answer " ++ (show v) ++ " (path B)") $ iRunQ (k v))
+        (\v -> prefixLocalContext ("For query " ++ (show q) ++ " pulling answer " ++ (show v) ++ " (path B)") $ runQProgram (k v))
         rs
 
       return $ concat rrs
@@ -269,7 +269,7 @@ iRunViewedQ i = case i of
 
   (QContext ctx) :>>= k -> {-# SCC case_context #-} do
     liftIO $ putStrLn $ "Adding context " ++ ctx
-    prefixLocalContext ctx $ iRunQ (k ())
+    prefixLocalContext ctx $ runQProgram (k ())
 
 concatLocalContext (ResultContext ctxs) a = replaceLocalContext
   (\(ResultContext ctxs') -> ResultContext (ctxs ++ ctxs'))
