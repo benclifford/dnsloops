@@ -158,6 +158,8 @@ iRunViewedQ i = case i of
     -- recorded information for use later. The record does not
     -- return any information so we do not need to change the
     -- context for k.
+    -- ... actually I do record it, in the resultContexts table
+    -- but I don't make use of it in QPull...
 
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
@@ -213,7 +215,7 @@ iRunViewedQ i = case i of
       
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
       prefixLocalContext
-        ((show q) ++ " ? => " ++ (show a) ++ " (path A)")
+        ((show q) ++ " ? => " ++ (show a))
        $ mapM_ (\(ctx, PreviousPullContinuation f) -> concatLocalContext ctx $ runQProgram (unQ $ f a)) cbs 
 -- TODO: XXX - use ctx context to augment current context somehow (we want access to both contexts - do I just append them or can there be more interesting tree-like description?
      Nothing -> return ()
@@ -251,12 +253,12 @@ iRunViewedQ i = case i of
         -- already known. This may results in the above callback
         -- being invoked, if relevant pushes happen.
         db <- readTVar ref
-        return $ previousResultsForQuery db q
+        return $ previousResultsForQueryWithIds db q
 
       liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
 
       rrs <- mapM
-        (\v -> prefixLocalContext ((show q) ++ " ? => " ++ (show v) ++ " (path B)") $ runQProgram (k v))
+        (\(v, rid) -> prefixLocalContext ((show q) ++ " ? => " ++ (show v) ++ " [RESULT ID " ++ (show rid) ++ "]") $ runQProgram (k v))
         rs
 
       return $ concat rrs

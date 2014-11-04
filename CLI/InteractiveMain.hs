@@ -88,6 +88,8 @@ interactiveStage db = do
 explain db resultId = do
   putStrLn $ "Explaining result " ++ resultId
 
+  putStrLn $ "Result is: " ++ (show $ previousResultForId db (read resultId))
+
   -- This result came from a query. Q. which is encoded in the
   -- query/result pair.
 
