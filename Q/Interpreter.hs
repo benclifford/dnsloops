@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TupleSections #-}
 
 module Q.Interpreter where
 
@@ -74,7 +75,7 @@ runQ m = do
              r <- m
              pushFinalResult r
 
-  runReaderT (runReaderT (iRunQ p) (ResultContext ["runQ"])) globalContext
+  runReaderT (runReaderT (iRunQ p) (ResultContext ["root run"])) globalContext
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
@@ -94,13 +95,13 @@ iRunQ m = iRunViewedQ (view m)
 forkIRunQ :: QProgram final () -> InterpreterAction final ()
 forkIRunQ m = do
   globalContext <- askGlobalContext
+  localContext <- askLocalContext
   liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+1)
   -- TODO better to use forkFinally finally rather than forkIO
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
   liftIO $ forkIO $ do
-    -- void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext ["forkedIRunQ"])
-    void $ runReaderT (runReaderT (iRunViewedQ (view m)) (ResultContext ["forkedIRunQ"])) globalContext
+    void $ runReaderT (runReaderT (iRunQ m) localContext) globalContext
     liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
   return ()
@@ -121,6 +122,12 @@ iRunViewedQ i = case i of
     iRunQ (k v)
 
   (QLaunch q) :>>= k ->  {-# SCC case_launch #-} do
+
+    -- TODO: maybe want to store the current context associated with
+    -- the launch. We don't need to change the local context for k,
+    -- though, because the launch does not return any information
+    -- for k to use.
+
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "LAUNCH: " ++ (show q)
     let newLaunchPL = PreviousLaunch q
 
@@ -146,6 +153,11 @@ iRunViewedQ i = case i of
     iRunQ (k ())
 
   (QRecord q a) :>>= k ->  {-# SCC case_record #-} do
+
+    -- TODO: maybe want to record the current context against this
+    -- recorded information for use later. The record does not
+    -- return any information so we do not need to change the
+    -- context for k.
 
     -- TODO: maybe still want to log this in debug mode? liftIO $ putStrLn $ "Recording result: query " ++ (show q) ++ " => " ++ (show a)
 
@@ -193,21 +205,32 @@ iRunViewedQ i = case i of
       
       cbs <- do
         
-        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a') ->
+        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a' c') ->
              case (cast q') of
-               Just q'' | q'' == q -> cast a'
+               Just q'' | q'' == q -> (c',) <$> cast a'
                _ -> Nothing
         return $ catMaybes fm
       
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
-      mapM_ (\(PreviousPullContinuation f) -> iRunQ (unQ $ f a)) cbs 
+      prefixLocalContext
+        ("For query " ++ (show q) ++ " pulling answer " ++ (show a) ++ " (path A)")
+       $ mapM_ (\(ctx, PreviousPullContinuation f) -> concatLocalContext ctx $ iRunQ (unQ $ f a)) cbs 
+-- TODO: XXX - use ctx context to augment current context somehow (we want access to both contexts - do I just append them or can there be more interesting tree-like description?
      Nothing -> return ()
 
     iRunQ (k ())
 
   (QPull q) :>>= k ->  {-# SCC case_pull #-} do
+
     liftIO $ putStrLn $ "PULL: " ++ (show q)
 
+    -- TODO: there will be some context associated with
+    -- the return value of this pull which we should
+    -- make available for k.
+    -- For now, record the fact that a pull with
+    -- a specific query was invoked.   
+    let additionalContext = "Pulled a result from query: " ++ (show q)
+    prefixLocalContext additionalContext $ do
     -- TODO: register some kind of continuation of k to be run when
     -- new results are encountered
     -- BUG? The rest of the program may come up with other results
@@ -216,24 +239,27 @@ iRunViewedQ i = case i of
     -- TODO: make a test case to exercise this subtlety
 
 --  PreviousPull :: forall q . forall a . (Qable q a) => q -> (a -> Q ()) -> PreviousPull
-    let callback = PreviousPull q (PreviousPullContinuation (\a -> Q $ k a >> return ()))
+      localContext <- askLocalContext
+      let callback = PreviousPull q (PreviousPullContinuation (\a -> Q $ k a >> return ())) localContext
 
-    ref <- askDB
+      ref <- askDB
 
-    rs <- liftIO $ atomically $ do
-      modifyTVar ref $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
+      rs <- liftIO $ atomically $ do
+        modifyTVar ref $ \olddb -> olddb { previousPulls = (previousPulls olddb) ++ [callback] }
 
-      -- run the rest of the program for every result that is
-      -- already known. This may results in the above callback
-      -- being invoked, if relevant pushes happen.
-      db <- readTVar ref
-      return $ previousResultsForQuery db q
+        -- run the rest of the program for every result that is
+        -- already known. This may results in the above callback
+        -- being invoked, if relevant pushes happen.
+        db <- readTVar ref
+        return $ previousResultsForQuery db q
 
-    liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
+      liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
 
-    rrs <- mapM (\v -> iRunQ (k v)) rs
+      rrs <- mapM
+        (\v -> prefixLocalContext ("For query " ++ (show q) ++ " pulling answer " ++ (show v) ++ " (path B)") $ iRunQ (k v))
+        rs
 
-    return $ concat rrs
+      return $ concat rrs
 
   -- | mplus should follow the left distribution law
   MPlus l ->  {-# SCC case_mplus #-} do
@@ -245,6 +271,9 @@ iRunViewedQ i = case i of
     liftIO $ putStrLn $ "Adding context " ++ ctx
     prefixLocalContext ctx $ iRunQ (k ())
 
+concatLocalContext (ResultContext ctxs) a = replaceLocalContext
+  (\(ResultContext ctxs') -> ResultContext (ctxs ++ ctxs'))
+  a
 
 prefixLocalContext ctx a = replaceLocalContext
   (\(ResultContext ctxs) -> ResultContext (ctx:ctxs))

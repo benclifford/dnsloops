@@ -101,8 +101,11 @@ explain db resultId = do
   let resultContext = Prelude.lookup (read resultId) (resultContexts db)
   -- TODO: display the context
 
-  putStr "result context: "
-  print resultContext
+  case resultContext of
+    Nothing -> putStrLn "No result context"
+    Just (ResultContext ctxs) -> do
+      putStrLn "Result context: "
+      mapM_ putStrLn ctxs
 
-  putStrLn $ "end explain of result " ++ resultId
+  putStrLn $ "End explain of result " ++ resultId
 
