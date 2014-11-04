@@ -67,11 +67,13 @@ instance Qable GetRRSetQuery where
     -- TODO: what to do with the results?
 
 populateRootHints :: DynamicStage
-populateRootHints = 
+populateRootHints = qcontext "root hints" >>
+  (
       (qrecord (GetRRSetQuery rootName NS)
                (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord rootName NS 0 noLen (RD_NS aName)]) *> empty)
   <|> (qrecord (GetRRSetQuery aName A)
                (GetRRSetAnswer $ Right $ canonicaliseRRSet $ [ResourceRecord aName A 0 noLen (RD_A aIP)]) *> empty)
+  )
   where rootName = pack ""
         aName = pack "a.root-servers.net."
         aIP = toIPv4 [198,41,0,4]
