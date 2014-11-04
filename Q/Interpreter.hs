@@ -34,7 +34,7 @@ import Q.DB
 --   each step in the program.
 
 
-type InterpreterAction final = ReaderT (GlobalContext final) (ReaderT LocalContext IO)
+type InterpreterAction final = ReaderT LocalContext (ReaderT (GlobalContext final) IO)
 
 data GlobalContext final = GlobalContext {
     _dbRef :: TVar (DB final),
@@ -74,7 +74,7 @@ runQ m = do
              r <- m
              pushFinalResult r
 
-  runReaderT (runReaderT (iRunQ p) globalContext) (ResultContext ["runQ"])
+  runReaderT (runReaderT (iRunQ p) (ResultContext ["runQ"])) globalContext
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
@@ -93,13 +93,14 @@ iRunQ m = iRunViewedQ (view m)
 -- reader and IO-fork...)
 forkIRunQ :: QProgram final () -> InterpreterAction final ()
 forkIRunQ m = do
-  globalContext <- ask
+  globalContext <- askGlobalContext
   liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+1)
   -- TODO better to use forkFinally finally rather than forkIO
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
   liftIO $ forkIO $ do
-    void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext ["forkedIRunQ"])
+    -- void $ runReaderT (runReaderT (iRunViewedQ (view m)) globalContext) (ResultContext ["forkedIRunQ"])
+    void $ runReaderT (runReaderT (iRunViewedQ (view m)) (ResultContext ["forkedIRunQ"])) globalContext
     liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
   return ()
@@ -249,13 +250,9 @@ prefixLocalContext ctx a = replaceLocalContext
   (\(ResultContext ctxs) -> ResultContext (ctx:ctxs))
   a
 
--- | this might be easier to implement if the localcontext was
---   the outer ReaderT or if both global and local shared a
---   single ReaderT
 replaceLocalContext :: (LocalContext -> LocalContext) -> InterpreterAction final a -> InterpreterAction final a
 replaceLocalContext f a = do
-  globalContext <- ask
-  lift $ local f $ runReaderT a globalContext
+  local f a
 
 unQ (Q p) = p
 
@@ -264,15 +261,18 @@ unQ (Q p) = p
 -- parameter for the RHS? Then the above two functions
 -- could share most of the implementation.
 
-askDB :: InterpreterAction x (TVar (DB x))
-askDB = _dbRef <$> ask
+askDB :: InterpreterAction final (TVar (DB final))
+askDB = _dbRef <$> askGlobalContext
 
 askLocalContext :: InterpreterAction x LocalContext
-askLocalContext = lift ask
+askLocalContext = ask
+
+askGlobalContext :: InterpreterAction final (GlobalContext final)
+askGlobalContext = lift $ ask
 
 nextResultId :: InterpreterAction x Integer
 nextResultId = do
-  tvar <- _resultIdRef <$> ask
+  tvar <- _resultIdRef <$> askGlobalContext
   liftIO $ atomically $ do
     n <- readTVar tvar
     modifyTVar tvar (+1)
