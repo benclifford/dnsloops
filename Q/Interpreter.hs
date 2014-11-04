@@ -205,15 +205,15 @@ iRunViewedQ i = case i of
       
       cbs <- do
         
-        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' a' c') ->
+        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' pk' ctx') ->
              case (cast q') of
-               Just q'' | q'' == q -> (c',) <$> cast a'
+               Just q'' | q'' == q -> (ctx',) <$> cast pk'
                _ -> Nothing
         return $ catMaybes fm
       
       liftIO $ putStrLn $ "For query " ++ (show q) ++ " there are " ++ (show $ length cbs) ++ " callbacks"
       prefixLocalContext
-        ("For query " ++ (show q) ++ " pulling answer " ++ (show a) ++ " (path A)")
+        ((show q) ++ " ? => " ++ (show a) ++ " (path A)")
        $ mapM_ (\(ctx, PreviousPullContinuation f) -> concatLocalContext ctx $ runQProgram (unQ $ f a)) cbs 
 -- TODO: XXX - use ctx context to augment current context somehow (we want access to both contexts - do I just append them or can there be more interesting tree-like description?
      Nothing -> return ()
@@ -256,7 +256,7 @@ iRunViewedQ i = case i of
       liftIO $ putStrLn $ "Processing previous results for query " ++ (show q)
 
       rrs <- mapM
-        (\v -> prefixLocalContext ("For query " ++ (show q) ++ " pulling answer " ++ (show v) ++ " (path B)") $ runQProgram (k v))
+        (\v -> prefixLocalContext ((show q) ++ " ? => " ++ (show v) ++ " (path B)") $ runQProgram (k v))
         rs
 
       return $ concat rrs
