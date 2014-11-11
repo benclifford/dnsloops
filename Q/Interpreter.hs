@@ -79,12 +79,15 @@ runQ m = do
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
-  liftIO $ atomically $ do
-    threadCount <- readTVar (_threadRef globalContext)
-    when (threadCount > 0) retry
+  waitUntilZero (_threadRef globalContext)
 
   db <- atomically $ readTVar $ _dbRef globalContext
   return (finalResults db, db)
+
+waitUntilZero tvar = do
+  liftIO $ atomically $ do
+    threadCount <- readTVar tvar
+    when (threadCount > 0) retry
 
 runQProgram :: QProgram final x -> InterpreterAction final [x]
 runQProgram m = runViewedQ (view m)
