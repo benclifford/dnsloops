@@ -14,10 +14,6 @@ import Control.Monad.IO.Class
 import Control.MonadPlus.Operational
 
 import Data.Dynamic
-import Data.Maybe
-import Data.Typeable
-
-import Lib
 
 -- * The monad on which everything runs
 
@@ -105,6 +101,7 @@ data DB final = DB {
     resultContexts :: [(ResultId, ResultContext)]
   }
 
+emptyDB :: DB final
 emptyDB = DB {
     previousLaunches = [],
     previousResults = [],
@@ -116,12 +113,17 @@ emptyDB = DB {
 qlaunch :: (Typeable final, Qable q) => q -> Q final (Answer q)
 qlaunch q = Q $ (singleton $ QLaunch q) *> empty
 
+qrecord :: (Typeable final, Qable q) => q -> Answer q -> Q final ()
 qrecord q a = Q $ singleton $ QRecord q a
 
+qpull :: (Typeable final, Qable q) => q -> Q final (Answer q)
 qpull q = Q $ singleton $ QPull q
 
+qcontext :: String -> Q final ()
 qcontext ctx = Q $ singleton $ QContext ctx
 
+query :: (Typeable final, Qable q) => q -> Q final (Answer q)
 query q = qlaunch q <|> qpull q
 
+pushFinalResult :: final -> Q final ()
 pushFinalResult v = Q $ singleton $ QPushFinalResult v

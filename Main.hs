@@ -5,33 +5,34 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (runReaderT, ask, ReaderT ())
+-- import Control.Monad.Reader (runReaderT, ask, ReaderT ())
 import Data.ByteString.Char8 (pack, unpack)
-import Data.Function (on)
+-- import Data.Function (on)
 import Data.IP
-import Data.List (tails, nub, groupBy, sortBy)
-import Data.Maybe (catMaybes, fromJust)
+import Data.List (nub)
+-- import Data.Maybe (catMaybes, fromJust)
 import Data.Typeable
 
 import Network.DNS
 
-import System.Environment (getArgs)
+-- import System.Environment (getArgs)
 import System.IO.Error
 
 import Domain
-import Instances
-import Lib
+import Instances()
+-- import Lib
 import Q
-import Q.Interpreter
+-- import Q.Interpreter
 import Query.GetRRSet
 import Query.Resolver
-import qualified Rules.DuplicateRRs
-import qualified Rules.RefusedQueries
-import qualified Rules.Stats
+-- import qualified Rules.DuplicateRRs
+-- import qualified Rules.RefusedQueries
+-- import qualified Rules.Stats
 import Stages
 import Util
-import Control.Monad
+-- import Control.Monad
 
 -- TODO: Qable instances should move into appropriate query class
 
@@ -47,7 +48,7 @@ instance Qable ResolverQuery where
     case result of
       Right res ->
         (qrecord q (ResolverAnswer (liftDNSError res)))
-        <|> cacheResolverAnswer rc d t res -- TODO: this probably needs more info about the query in order to perform validation.
+        <|> cacheResolverAnswer d t res -- TODO: this probably needs more info about the query in order to perform validation.
       Left ioErr -> qrecord q (ResolverAnswer (Left $ ResolverIOError ioErr))
         -- TODO: need to cache IOErrors somehow. In the same way as I'm recording DNSError I guess...
 
@@ -57,7 +58,7 @@ liftDNSError (Right v) = Right v
 
 instance Qable GetRRSetQuery where
   type Answer GetRRSetQuery = GetRRSetAnswer
-  runQable q@(GetRRSetQuery d ty) =
+  runQable (GetRRSetQuery d ty) =
     (report $  "Launching complex resolve for GetRRSetQuery: " ++ (show d) ++ " " ++ (show ty))
     <|>
     complexResolve d ty
@@ -98,7 +99,7 @@ complexResolve qname qrrtype = do
 
   let domainSuffixes = ancestorDomains qname
 
-  forA_ domainSuffixes $ \domainSuffixByteString -> do
+  void $ forA_ domainSuffixes $ \domainSuffixByteString -> do
 
     -- there's subtlety here that I haven't quite figured out
     -- to do with how I want to branch over all the nameservers in an
@@ -122,7 +123,7 @@ complexResolve qname qrrtype = do
 -- than a timeout) should be reported as a failure.
 -- So server interaction failure is different from non-existence failure,
 -- which is a comment about the state of the data model
-    forA_ nses $ \ns -> do
+    void $ forA_ nses $ \ns -> do
      report $ "Got nameserver " ++ (show ns) ++ " for domain " ++ (show domainSuffixByteString)
      -- TODO BUG: this pattern match will fail if the query
      -- returns a failure. That query should perhaps cascade,
@@ -131,8 +132,8 @@ complexResolve qname qrrtype = do
      -- fails.
      -- (GetRRSetAnswer (Right alist)) <- query (GetRRSetQuery ns A)
      nserverAddressRRSet <- query (GetRRSetQuery ns A)
-     case nserverAddressRRSet of 
-      (GetRRSetAnswer (Left e)) -> do
+     void $ case nserverAddressRRSet of 
+      (GetRRSetAnswer (Left _)) -> do
         -- TODO: see above:   qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Could not get address records for nameserver "++(show ns)))
         empty
       (GetRRSetAnswer (Right (CRRSet aRRset))) -> do
@@ -163,14 +164,15 @@ getNameServers :: Typeable final => Domain -> Q final [Domain]
 getNameServers domain = do
   GetRRSetAnswer a <- query (GetRRSetQuery domain NS)
   case a of
-    Left e ->    (report $ "Unhandled: error when getting nameserver for domain " ++ (show domain))
+    Left _ ->    (report $ "Unhandled: error when getting nameserver for domain " ++ (show domain))
               *> empty
     -- TODO ^ what to record for the error case? at present, we don't return
     -- anything tied to the query, not even an error
     Right (CRRSet rrs) -> return (   ( (\(RD_NS nsrv) -> nsrv)  . rdata ) <$> rrs)
 
 
-cacheResolverAnswer server qname qrrtype r = do
+cacheResolverAnswer :: (Show err, Typeable final) => Domain -> TYPE -> Either err (DNSMessage RDATA) -> Q final ()
+cacheResolverAnswer qname qrrtype r = do
       -- so this might be our answer! (one day)
       -- or more likely its a delegation - what does that look like according
       -- to the spec? My informal understanding is we get 
@@ -264,8 +266,8 @@ cacheResolverAnswer server qname qrrtype r = do
         (Right df) | (rcode . flags . header) df == NoErr
                    , ans <- answer df
                    , ans /= []
-                   , [qrrname] <- (nub (rrname <$> ans))
-                   , [qrrtype] <- (nub (rrtype <$> ans))
+                   , [_] <- (nub (rrname <$> ans))
+                   , [_] <- (nub (rrtype <$> ans))
                       -- check we only got answer records for the
                       -- rname and type that we requested
           -> 
@@ -298,6 +300,7 @@ cacheResolverAnswer server qname qrrtype r = do
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
 
 
+recordRRlist :: Typeable final => [ResourceRecord] -> Q final ()
 recordRRlist rs = let
   rrsets = rrlistToRRsets rs
   in forA_ rrsets (\rrset ->
