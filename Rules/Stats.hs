@@ -36,7 +36,7 @@ displayStatsByType = do
   -- more information contained in q because multiple
   -- q types can share the same a type.
   let resultTypes = typeOfPreviousResult <$> ((previousResults db))
-        where typeOfPreviousResult (PreviousResult q a _) = typeOf q
+        where typeOfPreviousResult (PreviousResult q _ _) = typeOf q
 
   putIO $ "Result types: " ++ (show $ nub resultTypes)
   forM_ (nub resultTypes) $ \lt -> putIO $
@@ -44,6 +44,4 @@ displayStatsByType = do
     ++ (show lt)
     ++ ": "
     ++ (show $ length $ filter (== lt) $ resultTypes)
-
-typeOfPreviousLaunch (PreviousLaunch q) = typeOf q
 

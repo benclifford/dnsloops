@@ -3,6 +3,7 @@
 module Rules.RefusedQueries where
 
 import Control.Applicative ( (<$>) )
+import Control.Monad (void)
 import Control.Monad.Reader (ask)
 
 -- TODO: these slightly unsafe functions
@@ -11,7 +12,7 @@ import Control.Monad.Reader (ask)
 import Data.Maybe (catMaybes, fromJust)
 import Data.Typeable (cast)
 
-import Data.Traversable (for)
+import Data.Traversable (Traversable(), for)
 
 import Network.DNS
 
@@ -64,10 +65,12 @@ Right (DNSFormat {header = DNSHeader {identifier = 4387,
 
 
 
+isRefused :: (t,ResolverAnswer) -> Bool
 isRefused (_, ResolverAnswer (Right df)) | (rcode . flags . header) df == Refused = True
 isRefused _ = False
 
-dumpRefuseds l = for l $ \(q,a) -> do
+dumpRefuseds :: (Show q, Show a, Traversable t) => t (q,a) -> StaticStage
+dumpRefuseds l = void $ for l $ \(q,a) -> do
   putIO $ "  For query: " ++ (show q)
   putIO $ "  Got refusal: " ++ (show a)
   putIO $ "  "
