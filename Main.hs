@@ -81,13 +81,6 @@ populateRootHints = qcontext "root hints" >>
 
 -- I wonder if qrecord should end empty/mzero rather than returning a single () ?
 -- Its probably nice to be able to use it sequentially in a do block though?
-  -- TODO: prepopulate our seatbelt root resolver information,
-  -- a subset of /domain/named.cache
-{- 
-.                        3600000  IN  NS    A.ROOT-SERVERS.NET.
-A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
-A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
--}
 
 -- | resolveRRSet must not add final results because
 -- it is used recursively.
