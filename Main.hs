@@ -69,7 +69,7 @@ instance Qable GetRRSetQuery where
   runQable (GetRRSetQuery d ty) =
     (report $  "Launching complex resolve for GetRRSetQuery: " ++ (show d) ++ " " ++ (show ty))
     <|>
-    complexResolve d ty
+    resolveRRSet d ty
     -- TODO: do I need this empty on the end?
     -- I'm unclear in general about when returning a () vs
     -- returning empty makes sense.
@@ -98,12 +98,12 @@ A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -}
 
--- | complexResolve must not add final results because
+-- | resolveRRSet must not add final results because
 -- it is used recursively.
 -- but it should record RRsets for GetRRSetQuery results
 -- I think.
-complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
-complexResolve qName qrrtype = do
+resolveRRSet :: Typeable final => Domain -> TYPE -> Q final ()
+resolveRRSet qName qrrtype = do
 
   let domainSuffixes = ancestorDomains qName
 
@@ -161,7 +161,7 @@ complexResolve qName qrrtype = do
           (ResolverAnswer r) <- query $ ResolverQuery
             (defaultResolvConf { resolvInfo = RCHostName rd })
             qName qrrtype
-          debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qName) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
+          debugReport $ "resolveRRSet: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qName) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
         empty
      empty
