@@ -87,7 +87,7 @@ runQ m = do
   return (finalResults db, db)
 
 runQProgram :: QProgram final x -> InterpreterAction final [x]
-runQProgram m = iRunViewedQ (view m)
+runQProgram m = runViewedQ (view m)
 
 -- | runs a Q in a new thread, rewrapping it in
 -- a ReaderT (so sort of performing a commute of
@@ -106,8 +106,8 @@ forkQProgram m = do
 
   return ()
 
-iRunViewedQ :: ProgramViewP (QInstruction final) x -> InterpreterAction final [x]
-iRunViewedQ i = case i of
+runViewedQ :: ProgramViewP (QInstruction final) x -> InterpreterAction final [x]
+runViewedQ i = case i of
 
   Return v -> {-# SCC case_return #-} return [v]
 
@@ -265,7 +265,7 @@ iRunViewedQ i = case i of
 
   -- | mplus should follow the left distribution law
   MPlus l ->  {-# SCC case_mplus #-} do
-    rs <- mapM iRunViewedQ l
+    rs <- mapM runViewedQ l
 
     return $ concat rs
 
