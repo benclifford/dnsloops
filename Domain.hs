@@ -57,8 +57,8 @@ rdataNSToDomain (RD_NS domain) = domain
 rdataNSToDomain rd = error $ "Cannot extract NS domain from non-NS RDATA: " ++ (show rd)
 
 ancestorDomains :: Domain -> [Domain]
-ancestorDomains qname = let
-  shreddedDomain = split '.' qname
+ancestorDomains qName = let
+  shreddedDomain = split '.' qName
   -- TODO BUG: handling of . inside domain labels (rather than as a separator)
   domainSuffixes = tails shreddedDomain
   domainParents = (intercalate (pack ".")) <$> domainSuffixes

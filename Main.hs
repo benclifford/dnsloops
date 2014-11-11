@@ -7,32 +7,22 @@ module Main where
 import Control.Applicative
 import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
--- import Control.Monad.Reader (runReaderT, ask, ReaderT ())
 import Data.ByteString.Char8 (pack, unpack)
--- import Data.Function (on)
 import Data.IP
 import Data.List (nub)
--- import Data.Maybe (catMaybes, fromJust)
 import Data.Typeable
 
 import Network.DNS
 
--- import System.Environment (getArgs)
 import System.IO.Error
 
 import Domain
 import Instances()
--- import Lib
 import Q
--- import Q.Interpreter
 import Query.GetRRSet
 import Query.Resolver
--- import qualified Rules.DuplicateRRs
--- import qualified Rules.RefusedQueries
--- import qualified Rules.Stats
 import Stages
 import Util
--- import Control.Monad
 
 -- TODO: Qable instances should move into appropriate query class
 
@@ -95,9 +85,9 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -- but it should record RRsets for GetRRSetQuery results
 -- I think.
 complexResolve :: Typeable final => Domain -> TYPE -> Q final ()
-complexResolve qname qrrtype = do
+complexResolve qName qrrtype = do
 
-  let domainSuffixes = ancestorDomains qname
+  let domainSuffixes = ancestorDomains qName
 
   void $ forA_ domainSuffixes $ \domainSuffixByteString -> do
 
@@ -152,8 +142,8 @@ complexResolve qname qrrtype = do
           -- TODO: parameterise the A
           (ResolverAnswer r) <- query $ ResolverQuery
             (defaultResolvConf { resolvInfo = RCHostName rd })
-            qname qrrtype
-          debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
+            qName qrrtype
+          debugReport $ "complexResolve: When querying nameserver " ++ (show ns) ++ " [" ++ (rd) ++ "] for " ++ (show qName) ++ "/" ++ (show qrrtype) ++ ", a resolver result is " ++ (show r)
 
         empty
      empty
@@ -172,7 +162,7 @@ getNameServers domain = do
 
 
 cacheResolverAnswer :: (Show err, Typeable final) => Domain -> TYPE -> Either err (DNSMessage RDATA) -> Q final ()
-cacheResolverAnswer qname qrrtype r = do
+cacheResolverAnswer qName qrrtype r = do
       -- so this might be our answer! (one day)
       -- or more likely its a delegation - what does that look like according
       -- to the spec? My informal understanding is we get 
@@ -246,7 +236,7 @@ cacheResolverAnswer qname qrrtype r = do
             <|>
                ( do
                     let cql = rdata <$>
-                                     (filter (\rr -> rrname rr =.= qname
+                                     (filter (\rr -> rrname rr =.= qName
                                                   && rrtype rr == CNAME)
                                              ans)
                     -- liftIO $ error $ "cql = " ++ (show cql) ++ ", ans = " ++ (show ans) ++ ", qname = " ++ (show qname)
@@ -258,9 +248,9 @@ cacheResolverAnswer qname qrrtype r = do
                     -- if its a Left, make a stack-trace like nested Left
                     case cnamedRRSet of
                       GetRRSetAnswer (Left err) ->
-                        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer $ Left $ "When resolving CNAME: " ++ err) *> empty
+                        qrecord (GetRRSetQuery qName qrrtype) (GetRRSetAnswer $ Left $ "When resolving CNAME: " ++ err) *> empty
                       GetRRSetAnswer a@(Right _) ->
-                        qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer a) *> empty
+                        qrecord (GetRRSetQuery qName qrrtype) (GetRRSetAnswer a) *> empty
                 )
 
         (Right df) | (rcode . flags . header) df == NoErr
@@ -286,16 +276,16 @@ cacheResolverAnswer qname qrrtype r = do
                    , answer df == []
                    , additional df == []
                    , nub (rrtype <$> (authority df)) == [SOA]
-          -> qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left "Name does not exist, RCODE 3"))
+          -> qrecord (GetRRSetQuery qName qrrtype) (GetRRSetAnswer (Left "Name does not exist, RCODE 3"))
 
         (Right df) | (rcode . flags . header) df == NoErr
                    , answer df == []
                    , nub (rrtype <$> (authority df)) == [SOA]
-          -> qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left "Name has no rrdata of this rrtype"))
+          -> qrecord (GetRRSetQuery qName qrrtype) (GetRRSetAnswer (Left "Name has no rrdata of this rrtype"))
 
         _ -> do
-               report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qname) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
-               qrecord (GetRRSetQuery qname qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: " ++ (show r)))
+               report $ "cacheResolverAnswer: UNEXPECTED result from resolver: Querying for " ++ (show qName) ++ "/" ++ (show qrrtype) ++ " => " ++ (show r)
+               qrecord (GetRRSetQuery qName qrrtype) (GetRRSetAnswer (Left $ "Unexpected result: " ++ (show r)))
                empty -- TODO something more interesting here
                -- TODO: i wonder how unexpected results should propagate when used to lookup values used already? I guess I want to look at the results for an RRset as a whole to see if all entries return an unexpected results rather than eg at least one returning an OK result - so that we can generate different warn levels.
 
