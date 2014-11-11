@@ -10,7 +10,7 @@
 module Q.Interpreter where
 
 import Control.Applicative
-import Control.Concurrent (forkIO, newEmptyMVar, putMVar, readMVar, MVar())
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (atomically, modifyTVar, newTVar, readTVar, retry, TVar() )
 import Control.Monad
 import Control.Monad.IO.Class
@@ -19,7 +19,6 @@ import Control.Monad.Reader
 
 import Data.Dynamic
 import Data.Maybe
-import Data.Typeable
 
 import Lib
 import Q
@@ -56,7 +55,7 @@ type LocalContext = ResultContext
 
 evalQ :: Q final final -> IO [final]
 evalQ m = do
-  (results, db) <- runQ m
+  (results, _) <- runQ m
   return results
 
 runQ  :: Q final final -> IO ([final], DB final)
@@ -75,7 +74,7 @@ runQ m = do
              r <- m
              pushFinalResult r
 
-  runReaderT (runReaderT (runQProgram p) (ResultContext ["root run"])) globalContext
+  void $ runReaderT (runReaderT (runQProgram p) (ResultContext ["root run"])) globalContext
 
   -- block until the thread count is 0, so no more
   -- activity can happen.
@@ -84,6 +83,7 @@ runQ m = do
   db <- atomically $ readTVar $ _dbRef globalContext
   return (finalResults db, db)
 
+waitUntilZero :: TVar Integer -> IO ()
 waitUntilZero tvar = do
   liftIO $ atomically $ do
     threadCount <- readTVar tvar
@@ -103,7 +103,7 @@ forkQProgram m = do
   -- TODO better to use forkFinally finally rather than forkIO
   -- so as to catch any exceptions. but it appears my dev ghc base
   -- is too old
-  liftIO $ forkIO $ do
+  void $ liftIO $ forkIO $ do
     void $ runReaderT (runReaderT (runQProgram m) localContext) globalContext
     liftIO $ atomically $ modifyTVar (_threadRef globalContext) (+(-1))
 
@@ -210,7 +210,7 @@ runViewedQ i = case i of
       
       cbs <- do
         
-        let fm = mapfor (previousPulls db) $ \r@(PreviousPull q' pk' ctx') ->
+        let fm = mapfor (previousPulls db) $ \(PreviousPull q' pk' ctx') ->
              case (cast q') of
                Just q'' | q'' == q -> (ctx',) <$> cast pk'
                _ -> Nothing
@@ -276,10 +276,12 @@ runViewedQ i = case i of
     liftIO $ putStrLn $ "Adding context " ++ ctx
     prefixLocalContext ctx $ runQProgram (k ())
 
+concatLocalContext :: ResultContext -> InterpreterAction final a -> InterpreterAction final a
 concatLocalContext (ResultContext ctxs) a = replaceLocalContext
   (\(ResultContext ctxs') -> ResultContext (ctxs ++ ctxs'))
   a
 
+prefixLocalContext :: String -> InterpreterAction final a -> InterpreterAction final a
 prefixLocalContext ctx a = replaceLocalContext
   (\(ResultContext ctxs) -> ResultContext (ctx:ctxs))
   a
@@ -288,6 +290,7 @@ replaceLocalContext :: (LocalContext -> LocalContext) -> InterpreterAction final
 replaceLocalContext f a = do
   local f a
 
+unQ :: Q s t -> QProgram s t
 unQ (Q p) = p
 
 -- TODO: can the PreviousResult and PreviousPull types be

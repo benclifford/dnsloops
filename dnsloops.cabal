@@ -9,17 +9,17 @@ Cabal-Version: >=1.6
 Executable dnsloops-test
   Build-depends: base, free-operational, mtl, transformers, stm
   main-is: Test.hs
-  ghc-options: -main-is Test
+  ghc-options: -main-is Test -Wall
 
 Executable dnsloops
   Build-depends: base, dns >=1.4, free-operational, mtl, bytestring, iproute, transformers, stm
   main-is: CLI/Main.hs
-  ghc-options: -main-is CLI.Main -threaded -rtsopts -fprof-auto
+  ghc-options: -main-is CLI.Main -threaded -rtsopts -fprof-auto -Wall
 
 Executable dnsloops-interactive
   Build-depends: base, dns >=1.4, free-operational, mtl, bytestring, iproute, transformers, stm
   main-is: CLI/InteractiveMain.hs
-  ghc-options: -main-is CLI.InteractiveMain -threaded -rtsopts -fprof-auto
+  ghc-options: -main-is CLI.InteractiveMain -threaded -rtsopts -fprof-auto -Wall
 
 
 Test-suite test-dnsloops
