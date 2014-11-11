@@ -14,7 +14,6 @@ import Instances()
 import Main
 import Q
 import Q.Interpreter
-import Query.GetRRSet
 -- import Query.Resolver
 import qualified Rules.DuplicateRRs
 import qualified Rules.RefusedQueries

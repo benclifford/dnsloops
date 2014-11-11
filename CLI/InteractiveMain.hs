@@ -17,7 +17,6 @@ import Main
 import Q
 import Q.DB
 import Q.Interpreter
-import Query.GetRRSet
 {-
 import qualified Rules.DuplicateRRs
 import qualified Rules.RefusedQueries

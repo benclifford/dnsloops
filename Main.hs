@@ -7,6 +7,7 @@ module Main where
 import Control.Applicative
 import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader(ReaderT())
 import Data.ByteString.Char8 (pack, unpack)
 import Data.IP
 import Data.List (nub)
@@ -19,12 +20,26 @@ import System.IO.Error
 import Domain
 import Instances()
 import Q
-import Query.GetRRSet
 import Query.Resolver
-import Stages
 import Util
 
--- TODO: Qable instances should move into appropriate query class
+
+-- There are two stages to processing:
+-- * the dynamic stage happens in the Q monad, and so code
+--   (eg checking rules) can launch new queries and cause
+--   new answers to appear. Because of this, some checks
+--   (such as processing over the entire list of results
+--   of a query) cannot be performed.
+-- * the static stage happens in the IO monad, or functionally,
+--   with read-only access to the query database. Processing
+--   performed at this stage cannot launch new queries and
+--   so no new answers will appear. This means we can run
+--   queries such as examining the entire list of results
+--   of a query.
+type DynamicStage = Q GetRRSetAnswer GetRRSetAnswer
+type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
+
+
 
 instance Qable ResolverQuery where
   type Answer ResolverQuery = ResolverAnswer
@@ -46,6 +61,9 @@ liftDNSError :: Either DNSError a -> Either ResolverError a
 liftDNSError (Left e) = Left (ResolverDNSError e)
 liftDNSError (Right v) = Right v
 
+
+data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable, Ord)
+data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 instance Qable GetRRSetQuery where
   type Answer GetRRSetQuery = GetRRSetAnswer
   runQable (GetRRSetQuery d ty) =

@@ -8,7 +8,7 @@ import Data.Typeable (typeOf)
 
 import Lib
 import Q
-import Stages
+import Main
 
 displayStats :: StaticStage
 displayStats = do

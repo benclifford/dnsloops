@@ -12,9 +12,8 @@ import Data.Typeable (cast)
 
 import Domain
 import Lib
+import Main
 import Q
-import Query.GetRRSet
-import Stages
 
 displayDuplicateRRSets :: StaticStage
 displayDuplicateRRSets = do

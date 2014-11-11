@@ -17,9 +17,9 @@ import Data.Traversable (Traversable(), for)
 import Network.DNS
 
 import Lib
+import Main
 import Q
 import Query.Resolver
-import Stages
 
 -- TODO: we could be hooking the refused response in the dynamic bit, where
 -- the main code currently (august 2014) emits an "unexpected response"
