@@ -5,38 +5,26 @@
 module CLI.InteractiveMain where
 
 import Control.Applicative
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (runReaderT, ask, ReaderT ())
-import Data.ByteString.Char8 (pack, unpack)
-import Data.Function (on)
-import Data.IP
-import Data.List (tails, nub, groupBy, isPrefixOf, sortBy)
-import Data.Maybe (catMaybes, fromJust)
-import Data.Typeable
-
-import Network.DNS
-
-import System.Environment (getArgs)
+import Control.Monad (void)
+import Data.ByteString.Char8 (pack)
+import Data.List (isPrefixOf)
 import System.IO (hFlush, stdout)
-import System.IO.Error
 
 import CLI.Args
 import Domain
-import Instances
-import Lib
+import Instances()
 import Main
 import Q
 import Q.DB
 import Q.Interpreter
 import Query.GetRRSet
-import Query.Resolver
+{-
 import qualified Rules.DuplicateRRs
 import qualified Rules.RefusedQueries
 import qualified Rules.Stats
-import Stages
-import Util
-import Control.Monad
+-}
 
+main :: IO ()
 main = do
   putStrLn "DNSLoops main"
 
@@ -48,7 +36,7 @@ main = do
 
   let q = GetRRSetQuery hostname ty
 
-  (res', db) <- {-# SCC dynamicStage #-} runQ $
+  (_, db) <- {-# SCC dynamicStage #-} runQ $
         populateRootHints
     <|> query q
 
@@ -58,7 +46,7 @@ main = do
   let res = previousResultsForQueryWithIds db q
 
   putStrLn "Result of main query: "
-  print `mapM` res
+  void $ print `mapM` res
 
 {-
   putStrLn "Static stage:"
@@ -72,6 +60,7 @@ main = do
 
   interactiveStage db
 
+interactiveStage :: DB final -> IO ()
 interactiveStage db = do
   putStr "dnsloops> "
   hFlush stdout
@@ -85,6 +74,7 @@ interactiveStage db = do
     _ -> putStrLn "Error: unrecognised command"
   interactiveStage db
 
+explain :: DB final -> String -> IO ()
 explain db resultId = do
   putStrLn $ "Explaining result " ++ resultId
 
