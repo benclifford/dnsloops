@@ -64,14 +64,7 @@ data GetRRSetQuery = GetRRSetQuery Domain TYPE deriving (Show, Eq, Typeable, Ord
 data GetRRSetAnswer = GetRRSetAnswer (Either String CRRSet) deriving (Show, Eq, Typeable)
 instance Qable GetRRSetQuery where
   type Answer GetRRSetQuery = GetRRSetAnswer
-  runQable (GetRRSetQuery d ty) =
-    (report $  "Launching complex resolve for GetRRSetQuery: " ++ (show d) ++ " " ++ (show ty))
-    <|>
-    resolveRRSet d ty
-    -- TODO: do I need this empty on the end?
-    -- I'm unclear in general about when returning a () vs
-    -- returning empty makes sense.
-    -- TODO: what to do with the results?
+  runQable (GetRRSetQuery d ty) = resolveRRSet d ty
 
 populateRootHints :: DynamicStage
 populateRootHints = qcontext "root hints" >>
@@ -102,6 +95,7 @@ A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:BA3E::2:30
 -- I think.
 resolveRRSet :: Typeable final => Domain -> TYPE -> Q final ()
 resolveRRSet qName qrrtype = do
+  report $  "Resolving query: " ++ (show qName) ++ "/" ++ (show qrrtype)
 
   let domainSuffixes = ancestorDomains qName
 
