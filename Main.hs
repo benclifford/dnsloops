@@ -39,8 +39,6 @@ import Util
 type DynamicStage = Q GetRRSetAnswer GetRRSetAnswer
 type StaticStage = ReaderT (DB GetRRSetAnswer) IO ()
 
-
-
 instance Qable ResolverQuery where
   type Answer ResolverQuery = ResolverAnswer
   runQable q@(ResolverQuery rc d t) = do
@@ -312,7 +310,7 @@ recordRRlist :: Typeable final => [ResourceRecord] -> Q final ()
 recordRRlist rs = let
   rrsets = rrlistToRRsets rs
   in forA_ rrsets (\rrset ->
-          (report $ "cacheResolverAnswer: ANSWER RRset: " ++ show rrset)
+          (report $ "recordRRlist: ANSWER RRset: " ++ show rrset)
           <|>
           (
              let
