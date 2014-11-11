@@ -11,11 +11,14 @@ import Q (Q)
 forA_ :: (Foldable t, Functor t, Alternative a) => t x -> (x -> a y) -> a y
 forA_ l f = asum (fmap f l)
 
+-- | Given a Traversable (eg a list) of values for type v,
+-- return each one as an alternative result.
+shred :: (Functor t, Foldable t, Alternative a) => t v -> a v
 shred l = forA_ l pure
 
 report :: String -> Q any ()
 report s = liftIO $ putStrLn s
 
 debugReport :: String -> Q any ()
-debugReport s = return ()
+debugReport _ = return ()
 -- debugReport s = liftIO $ putStrLn s

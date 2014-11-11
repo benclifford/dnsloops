@@ -4,12 +4,12 @@
 -- | types and functions for domains
 module Domain where
 
-import Instances
+import Instances()
 
 import Control.Applicative ( (<$>) )
 import Data.ByteString.Char8 (unpack, pack, intercalate, split)
 import Data.Function (on)
-import Data.List (tails, groupBy, sortBy, sort, nub)
+import Data.List (tails, groupBy, sortBy, nub)
 import Data.Monoid ( (<>) )
 import Data.Ord (comparing)
 import Network.DNS
@@ -54,6 +54,7 @@ ensureDot s = error $ "unexpected case in ensureDot: " ++ (show s)
 -- the failure some other way... TODO
 rdataNSToDomain :: RDATA -> Domain
 rdataNSToDomain (RD_NS domain) = domain
+rdataNSToDomain rd = error $ "Cannot extract NS domain from non-NS RDATA: " ++ (show rd)
 
 ancestorDomains :: Domain -> [Domain]
 ancestorDomains qname = let

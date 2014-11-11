@@ -6,4 +6,6 @@ import Control.Monad.IO.Class (liftIO, MonadIO)
 putIO :: MonadIO m => String -> m ()
 putIO = liftIO . putStrLn
 
+-- | replace with Traverseable?
+mapfor :: [a] -> (a -> b) -> [b]
 mapfor = flip map
