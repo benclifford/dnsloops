@@ -467,3 +467,4 @@ dnsloops: getAddrInfo: does not exist (Address family for hostname not supported
 
 -- TODO: reverse DNS on MX records
 
+-- TODO: check out https://howdns.works/ webcomic and see if it has anything expository
