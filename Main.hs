@@ -336,6 +336,10 @@ recordRRlist rs = let
 -- RFC one). give post-facto report on consistency
 -- (can have post-facto reports build incrementally
 -- but not permitted to cause new queries to run)
+-- Also can switch on RFC5001 NSID DNS option in
+-- regular queries (that's a thing like DNSSEC and
+-- TCP thatcould be enabled and disabled for all queries
+-- and so done several times in various combinations)
 
 -- TODO: get SOA for every known zone from every known
 -- server and give reports on inconsistency
@@ -468,3 +472,9 @@ dnsloops: getAddrInfo: does not exist (Address family for hostname not supported
 -- TODO: reverse DNS on MX records
 
 -- TODO: check out https://howdns.works/ webcomic and see if it has anything expository
+
+-- TODO: case fuzzing - when we launch a query, launch the same query with fuzzed case, n-times. https://tools.ietf.org/id/draft-vixie-dnsext-dns0x20-00.txt advocated doing this for query identity, but isn't used much. it is interesting to check that servers return the same result, though.
+
+-- TODO: ATLAS probe can be used to launch one off measurements elsewhere on the internet and observe the results.
+
+
