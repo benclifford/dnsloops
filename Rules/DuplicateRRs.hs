@@ -10,6 +10,8 @@ import Data.List
 import Data.Maybe (fromJust, catMaybes)
 import Data.Typeable (cast)
 
+import Network.DNS.Types 
+
 import Domain
 import Lib
 import Main
@@ -17,11 +19,11 @@ import Q
 
 displayDuplicateRRSets :: StaticStage
 displayDuplicateRRSets = do
-  putIO $ "Queries for which more than one RRSet was found:"
+  putIO $ "; Queries for which more than one RRSet was found:"
   db <- ask
   let pRes = previousResults db
   let filtered = catMaybes (maybeGetRRSetQuery <$> pRes)
-  putIO $ "There are " ++ (show $ length filtered) ++ " GetRRSetQueries"
+  putIO $ "; There are " ++ (show $ length filtered) ++ " GetRRSetQueries with more than one RRSet"
 
   let sortedByQ = sortBy (compare `on` fst3) filtered
   let groupedByQ = groupBy ( (==) `on` fst3) sortedByQ
@@ -29,13 +31,18 @@ displayDuplicateRRSets = do
 
   forM_ duplicatesByQ $ \g -> do
     let (GetRRSetQuery name typ,_,_) = head g -- There must be at least one group because this comes from groupBy, and the fst element should be the same for all elements in the group
-    putIO $ (unpack name) ++ "/" ++ (show typ) ++ ":"
+    let rrNameString = (unpack name) ++ " " ++ (show typ)
+    putIO $ ""
+    putIO $ "; " ++ rrNameString
     forM_ g $ \(_,GetRRSetAnswer a, rid) -> case a of
-      Left err -> putIO $ "  Non-RRSet response: " ++ err ++ " [RID " ++ (show rid) ++ "]"
+      Left err -> do
+        putIO $ "; [RID " ++ (show rid) ++ "] (" ++ rrNameString ++ ") non-RRSet response: " ++ err
       Right (CRRSet rrset) -> do
-        putIO "  ["
-        forM_ rrset $ \rr -> putIO $ "    " ++ (show rr)
-        putIO $ "  ] [RID " ++ (show rid) ++ "]"
+        putIO $ "; [RID " ++ (show rid) ++ "]  " ++ (show $ length rrset) ++ " resource record(s)"
+        forM_ rrset $ \rr -> putIO $ renderResourceRecordAsZoneFile rr
+
+-- root-servers.net. NS  ResourceRecord {rrname = "root-servers.net.", rrtype = NS, rrttl = 172800, rdlen = 4, rdata = f.root-servers.net.}
+renderResourceRecordAsZoneFile rr = (unpack $ rrname rr) ++ " " ++ (show $ rrtype rr) ++ " " ++ (show $ rrttl rr) ++ " " ++ (show $ rdata rr) ++ " ; rdlen = " ++ (show $ rdlen rr)
 
 fst3 (v,_,_) = v
 
