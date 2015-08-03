@@ -24,8 +24,6 @@ import Control.Monad (void)
 
 main :: IO ()
 main = do
-  putStrLn "DNSLoops main"
-
   (h, ty) <- getOptions
 
   let hostname = ensureDot $ pack h
