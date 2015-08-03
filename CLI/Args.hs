@@ -45,6 +45,6 @@ wrapNonOption nonopt = error $ "Cannot deal with non-option " ++ nonopt
 
 doHelp :: OptionConfigurer
 doHelp = do
-  liftIO $ putStrLn "HELP HERE"
+  liftIO $ putStrLn $ usageInfo "Command-line parameters:" optionDescrs
   liftIO $ exitWith ExitSuccess
 
