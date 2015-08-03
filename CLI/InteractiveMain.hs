@@ -47,16 +47,6 @@ main = do
   putStrLn "Result of main query: "
   void $ print `mapM` res
 
-{-
-  putStrLn "Static stage:"
-
-  {-# SCC staticStage #-} (flip runReaderT) db $ do
-      Rules.Stats.displayStats
-      Rules.Stats.displayStatsByType
-      Rules.DuplicateRRs.displayDuplicateRRSets
-      Rules.RefusedQueries.displayRefusedQueries
--}
-
   interactiveStage db
 
 interactiveStage :: DB final -> IO ()
