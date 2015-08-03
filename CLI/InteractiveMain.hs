@@ -85,8 +85,8 @@ explain db resultId = do
   case resultContext of
     Nothing -> putStrLn "No result context"
     Just (ResultContext ctxs) -> do
-      putStrLn "Result context: "
-      mapM_ putStrLn ctxs
+      putStrLn $ "Result context: (" ++ (show $ length ctxs) ++ " entries)"
+      mapM_ (\ctx -> putStrLn ctx >> putStrLn ";" ) ctxs
 
   putStrLn $ "End explain of result " ++ resultId
 
